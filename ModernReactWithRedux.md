@@ -337,3 +337,245 @@ Avoid having multiple return method inside render method
     );
   }
 ```
+
+## Section 7
+create-react-app pics
+### onChange
+```jsx
+<input type="text" onChange={this.onInputChange}/>
+```
+当```onChange={this.onInputChange}```写成```onChange={this.onInputChange()}```时，表示每次render执行时，onInputChange()都会被执行一次,在这里
+- User clicks on something:onClick
+- User changes text in an input:onChange
+- User submits a form:onSubmit
+
+### controlled vs uncontrolled
+controlled: centralize all of the information that we have inside of our React component  
+the entire idea is to make sure it's the react application, driving and storing all data and not the HTML side of things.
+```jsx
+            <input
+              type="text"
+              value={this.state.term}
+              onChange={(e) => this.setState({ term: e.target.value })}
+            />
+```
+uncontrolled: we have to fetch the information from the HTML DOM
+```jsx
+            <input
+              type="text"
+              onChange={(e) => console.log(e)})}
+            />
+```
+### 解决this undefined 的三种办法
+1. bind
+2. 改用arrow function
+3. 调用方法时，使用arrow function，比如，注意，这里方法后面加了()
+```jsx
+onFormSubmit(event) {
+    event.preventDefault();
+    console.log(this.state.term);
+  }
+<form className="ui form" onSubmit={ event => this.onFormSubmit()}>
+```
+axios vs fetch:
+- axios:3rd party package
+- fetch:function built into modern browsers
+
+npm install --save axios
+
+```jsx
+import React from "react";
+import axios from 'axios';
+import SearchBar from "./SearchBar";
+```
+> 一般我们引用的dependencies和第三方library都会放在自己创建的文件之上
+
+```jsx
+axios.get('https://api.unsplash.com/search/photos',{
+      params:{query: term}
+    });
+```
+等同于
+```jsx
+axios.get('https://api.unsplash.com/search/photos?query=term',);
+```
+
+### 解决axios返回异步的两种方式：
+```jsx
+    axios
+      .get("https://api.unsplash.com/search/photos", {
+        params: { query: term },
+        headers: {
+          Authorization:
+            "Client-ID 8kWv6hlbzltKXl8gwsBw3e2KtD_R-OtREAv0Mw3KUss",
+        },
+      })
+      .then((response) => {
+        console.log(response.data.results);
+      });
+```
+```jsx
+  async onSearchSubmit(term) {
+    const response = await axios.get("https://api.unsplash.com/search/photos", {
+      params: { query: term },
+      headers: {
+        Authorization: "Client-ID 8kWv6hlbzltKXl8gwsBw3e2KtD_R-OtREAv0Mw3KUss",
+      },
+    });
+
+    console.log(response.data.results);
+  }
+```
+> 初始化array state的时候，要写成
+> ```state = { images: [] };```
+> 初始化number state的时候，要写成
+> ```this.state = { lat: null };```
+> 初始化string state的时候，要写成
+> ```state = { errorMessage: "" };```
+
+### arrow function加异步处理
+```jsx
+onSearchSubmit = async (term) => {
+    const response = await axios.get("https://api.unsplash.com/search/photos", {
+      params: { query: term },
+      headers: {
+        Authorization: "Client-ID 8kWv6hlbzltKXl8gwsBw3e2KtD_R-OtREAv0Mw3KUss",
+      },
+    });
+
+    this.setState({ images: response.data.results });
+  };
+```
+## Section 9
+```jsx
+const numbers = [0,1,2,3,4];
+```
+以下
+```jsx
+let newNumbers = [];
+for(let i = 0; i < numbers.length; i++>) {
+  newNumbers.push(numbers[i]*10);
+}
+```
+等效于
+```jsx
+numbers.map((num) => num * 10);
+```
+类似用法
+```jsx
+const users = [
+  { id: 1, name: 'Leanne Graham' },
+  { id: 2, name: 'Ervin Howell' },
+  { id: 3, name: 'Clementine Bauch' },
+  { id: 4, name: 'Patricia Lebsack' }
+];
+
+
+export default class App extends React.Component {
+    
+
+  render() {
+    const urs = users.map(({id, name})=>{return <li key={id}>{name}</li>;});
+    return (
+        <ul>
+            {urs}
+        </ul>
+    );
+  }
+}
+```
+### 参数解构
+```jsx
+const images = props.images.map((image) => {
+    return (
+      <img key={image.id} src={image.urls.regular} alt={image.description} />
+    );
+  });
+```
+变为
+```jsx
+const images = props.images.map(({ description, id, urls }) => {
+    return <img key={id} src={urls.regular} alt={description} />;
+  });
+```
+
+## Section 10
+### React Refs
+- Gives access to a single DOM element
+- We create refs in the constructor, assign them to instance variables, then pass to a particular JSX element as props
+
+### Load event
+```jsx
+      <div>
+        <img ref={this.imageRef} alt={description} src={urls.regular} />
+      </div>
+```
+img load有延时，如何等待img加载完成执行callback，可以通过ref添加eventListener，例如
+```jsx
+constructor(props) {
+    super(props);
+
+    this.imageRef = React.createRef();
+  }
+
+  componentDidMount() {
+    console.log(this.imageRef);
+    this.imageRef.current.addEventListener("load", this.setSpans);
+  }
+
+  setSpans = () => {
+    console.log(this.imageRef.current.clientHeight);
+  };
+
+  render() {
+    const { description, urls } = this.props.image;
+
+    return (
+      <div>
+        <img ref={this.imageRef} alt={description} src={urls.regular} />
+      </div>
+    );
+  }
+```
+The Math.ceil() function always rounds a number up to the next largest integer.
+
+### 输入框与用户输入同步的通常写法
+```jsx
+            <input
+              type="text"
+              value={this.state.term}
+              onChange={(e) => this.setState({ term: e.target.value })}
+            />
+```
+### createRef用法实例
+```jsx
+class ImageCard extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = { spans: 0 };
+
+    this.imageRef = React.createRef();
+  }
+
+  componentDidMount() {
+    this.imageRef.current.addEventListener("load", this.setSpans);
+  }
+
+  setSpans = () => {
+    const height = this.imageRef.current.clientHeight;
+    const span = Math.ceil(height / 10);
+    this.setState({ spans: span });
+  };
+
+  render() {
+    const { description, urls } = this.props.image;
+
+    return (
+      <div style={{ gridRowEnd: `span ${this.state.spans}` }}>
+        <img ref={this.imageRef} alt={description} src={urls.regular} />
+      </div>
+    );
+  }
+}
+```
