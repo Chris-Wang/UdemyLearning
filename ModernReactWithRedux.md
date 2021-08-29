@@ -579,3 +579,104 @@ class ImageCard extends React.Component {
   }
 }
 ```
+
+## Section 11:
+Component Design:
+In this App, we needs
+- SearchBar: for user input
+- VideoList：on the right, and contains  
+  - VideoItem
+- VideoDetails
+
+AIzaSyCEmEDGhsSrNaAjlEgKArFQ8JyrG3hikHY
+
+> const value一般用全大写命名变量
+
+### Deeply Nested Callbacks
+Talking from children to parent, use callbacks
+```jsx
+//App.js
+  onVideoSelect = (video) => {
+    console.log("From the App!", video);
+  };
+
+  render() {
+    return (
+      <div className="ui container">
+        <SearchBar onFormSubmit={this.onTermSubmit} />
+        <VideoList
+          videos={this.state.videos}
+          onVideoSelect={this.onVideoSelect}
+        />
+      </div>
+    );
+  }
+```
+```jsx
+//VideoList.js
+const VideoList = ({ videos, onVideoSelect }) => {
+  const renderedList = videos.map((video) => {
+    return <VideoItem video={video} onVideoSelect={onVideoSelect} />;
+  });
+  return <div className="ui relaxed divided list">{renderedList}</div>;
+};
+```
+```jsx
+//VideoItem.js
+const VideoItem = ({ video, onVideoSelect }) => {
+  return (
+    <div className="video-item item" onClick={() => onVideoSelect(video)}>
+      <img
+        className="ui image"
+        src={video.snippet.thumbnails.medium.url}
+        alt={video.snippet.title}
+      />
+      <div className="content">
+        <div className="header">{video.snippet.title}</div>
+      </div>
+    </div>
+  );
+};
+```
+### Conditional Rendering
+注意，这里condtion被放到了底层
+```jsx
+const VideoDetail = ({ video }) => {
+  if (!video) {
+    return <div>Loading...</div>;
+  }
+  return (
+    <div>
+      <div className="ui segment">
+        <h4 className="ui header">{video.snippet.title}</h4>
+        <p>{video.snippet.description}</p>
+      </div>
+      ;
+    </div>
+  );
+};
+```
+### Semantic UI Grid
+16格的单行划分
+```jsx
+ render() {
+    return (
+      <div className="ui container">
+        <SearchBar onFormSubmit={this.onTermSubmit} />
+        <div className="ui grid">
+          <div className="ui row">
+            <div className="eleven wide column">
+              <VideoDetail video={this.state.selectedVideo} />
+            </div>
+            <div className="five wide column">
+              <VideoList
+                videos={this.state.videos}
+                onVideoSelect={this.onVideoSelect}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+```
