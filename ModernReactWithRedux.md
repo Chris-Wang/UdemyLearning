@@ -1,4 +1,7 @@
 
+
+## 单词
+legible: 易读的，清晰的
 ## Section 1&2:
 Components in React:
 - produce JSX, which tells react what we want to show on the screen
@@ -1064,3 +1067,192 @@ useEffect(() => {
     doTranslation();
   }, [language, text]);
 ```
+
+## Section 13
+### 使用window.location来route
+```jsx
+const showAccordion = () => {
+  if (window.location.pathname === "/") {
+    return <Accordion items={items} />;
+  }
+};
+
+const showList = () => {
+  if (window.location.pathname === "/list") {
+    return <Search />;
+  }
+};
+
+const showDropdown = () => {
+  if (window.location.pathname === "/dropdown") {
+    return <Dropdown />;
+  }
+};
+
+const showTranslate = () => {
+  if (window.location.pathname === "/translate") {
+    return <Translate />;
+  }
+};
+
+const App = () => {
+  const [selected, setSelected] = useState(options[0]);
+
+  return (
+    <div>
+      {showAccordion()}
+      {showList()}
+      {showDropdown()}
+      {showTranslate()}
+    </div>
+  );
+};
+```
+### window.location 结合component，三元表达式，实现route 功能
+```jsx
+//Route.js
+const Route = ({ path, children }) => {
+  return window.location.pathname === path ? children : null;
+};
+
+export default Route;
+```
+```jsx
+//App.js
+const App = () => {
+  const [selected, setSelected] = useState(options[0]);
+
+  return (
+    <div>
+      <Route path="/">
+        <Accordion items={items}></Accordion>
+      </Route>
+      <Route path="/list">
+        <Search />
+      </Route>
+      <Route path="/dropdown">
+        <Dropdown
+          label="Select a color"
+          options={options}
+          selected={selected}
+          onSelectChange={setSelected}
+        />
+      </Route>
+      <Route path="/translate">
+        <Translate />
+      </Route>
+    </div>
+  );
+};
+```
+### 使用URL的方式来实现导航
+```jsx
+const Header = () => {
+  return (
+    <div className="ui secondary pointing menu">
+      <a href="/" className="item">
+        Accordion
+      </a>
+      <a href="/list" className="item">
+        Search
+      </a>
+      <a href="/dropdown" className="item">
+        Dropdown
+      </a>
+      <a href="/translate" className="item">
+        Translate
+      </a>
+    </div>
+  );
+};
+```
+但是以上的问题，是每次点击一个链接都会导致full page reload
+### change URL,但是不会reload页面的方法
+```jsx
+window.history.pushState({},'','/translate')
+```
+使用这种方法我们希望点击一个<a>时，
+- 改变地址栏地址
+- 停止页面刷新
+- 点击的同时发送一个navevent
+- 放置的监听器，捕捉到这个event，并执行callback
+实现代码如下：
+```jsx
+//Route.js
+const Route = ({ path, children }) => {
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  useEffect(() => {
+    const onLocationChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+
+    window.addEventListener("popstate", onLocationChange);
+
+    return () => {
+      window.removeEventListener("popstate", onLocationChange);
+    };
+  }, []);
+
+  return currentPath === path ? children : null;
+};
+```
+```jsx
+//Link.js
+const Link = ({ className, href, children }) => {
+  const onClick = (event) => {
+     if (event.metaKey || event.ctrlKey) {
+      return;
+    }
+    event.preventDefault();
+    window.history.pushState({}, "", href);
+
+    const navEvent = new PopStateEvent("popstate");
+    window.dispatchEvent(navEvent);
+  };
+
+  return (
+    <a onClick={onClick} className={className} href={href}>
+      {children}
+    </a>
+  );
+};
+```
+### 引用set方法的refactor
+```jsx
+            <VideoList
+              videos={videos}
+              onVideoSelect={(video) => setSelectedVideo(video)}
+            />
+```
+以上，完全等同于
+```jsx
+            <VideoList
+              videos={videos}
+              onVideoSelect={setSelectedVideo}
+            />
+```
+
+### Custom Hooks
+- Best way to create reusable code in a React project (besides components!)
+- Created by extracting hook-related code out of a function component
+- Custom hooks always make use of at least one primitive hook internally
+- Each custom hook should have one purpose
+- Kind of an art form!
+- Data-fetching is a great thing to try to make reusable
+
+### Process for Building Custom Hooks
+- Identify each line of code related to some single purpose
+- Identify the inputs to that code
+- Identify the outputs to that code
+- Extract all of the code into a separate function, receiving the inputs as arguments, and returning the outputs
+
+### Custom hooks 的返回
+既可以写成
+```jsx
+return [video, onTermSubmit];
+```
+也可以写成
+```jsx
+return {video, onTermSubmit};
+```
+其中onTermSubmit是function
