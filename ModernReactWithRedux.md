@@ -680,3 +680,387 @@ const VideoDetail = ({ video }) => {
     );
   }
 ```
+
+## Section 12
+### Hooks System
+- useState: Function that lets you use state in a functional component
+- useEffect: Function that lets you use something like lifecycle methods in a functional component
+- useRef：Function that lets you create a 'ref' in a function component
+
+### React.Fragment
+如何巧妙的去掉<div>，同时又合理的保留key，参考以下
+```jsx
+  const renderedItems = items.map((item) => {
+    return (
+      <React.Fragment key={item.title}>
+        <div className="title active">
+          <i className="dropdown icon"></i>
+          {item.title}
+        </div>
+        <div className="content active">
+          <p>{item.content}</p>
+        </div>
+      </React.Fragment>
+    );
+  });
+```
+### Array解构
+```jsx
+const colors = ['red','blue'];
+const [firstElement, secondElement] = colors;
+```
+### useState
+```jsx
+const [activeIndex, setActiveIndex] = useState(null);
+```
+- ```null``：state默认的value，initial value for this piece of state
+- activeIndex: piece of state
+- setActiveIndex: functions to change this pice of state   
+每次调用```setActiveIndex(index)```，都会rerender
+- 这个rerender会讲component里的代码全部执行一遍
+- 但是useState(null)里的null将不会被重新赋值，而会被setActiveIndex(index)里的index取代，这个初始值仅在初始化的时候会被提取
+
+### class components vs function components
+Initialization:
+- Class:```state = { activeIndex: 0 }```
+- Function:```useState(0)```
+Reference:
+- Class:```this.state.activeIndex```
+- Function:```activeIndex;```
+Updates:
+- Class:```this.setState({ activeIndex: 10 })```
+- Function:```setActiveIndex(10);```
+
+### input field function component
+```jsx
+const [term, setTerm] = useState("");
+
+  return (
+    <div>
+      <div className="ui form">
+        <div className="field">
+          <label>Enter Search Tern</label>
+          <input
+            className="input"
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+          ></input>
+        </div>
+      </div>
+    </div>
+  );
+```
+en.wikipedia.org/w/api.php?action=query&list=search&format=json&origin=*&srsearch=programming
+
+### The 'useEffect' Hook
+Allows function components to use something like lifecycle methods, We configure the hook to run some code automatically in one of three scenarios
+- When the component is rendered for the first time only
+- When the component is rendered for the first time and whenever it rerenders 
+- When the component is rendered for the first time and (whenever it rerenders and some piece of data has changed)
+
+### Second argument in UseEffect
+for the second argument, you only see
+```jsx
+useEffect(() =>{
+    console.log("what");
+  });
+```
+- Run at initial render
+- Run after every rerender
+- Run When the component is rendered for the first time and whenever it rerenders 
+```jsx
+useEffect(() =>{
+    console.log("what");
+  }, []);
+```
+- Run at initial render
+- Run When the component is rendered for the first time only
+```jsx
+useEffect(() =>{
+    console.log("what");
+  }, [term]);
+```
+- Run at initial render
+- Run after every rerender if data has changed since last render
+- Run When the component is rendered for the first time and (whenever it rerenders and some piece of data has changed)
+
+# Async Code in useEffect
+async是不能直接用在 useEffect里的，像下面这样
+```jsx
+useEffect(async() =>{
+   await console.log("what");
+  }, [term]);
+```
+可以使用以下三种方法解决：
+```jsx
+  useEffect(() =>{
+    const search = async() => {
+      await axios.get('term');
+    };
+    search();
+  }, [term]);
+```
+```jsx
+  useEffect(() =>{
+    (async() => {
+      await axios.get('term');
+    })();
+  }, [term]);
+```
+```jsx
+  useEffect(() => {
+    axios.get("term").then((response) => {
+      console.log("api");
+    });
+  }, [term]);
+```
+### useEffect's cleanup function
+useEffect里的callback fucntion里，只能有一种返回类型，就是function，这个function可以叫cleanup function，它在initial render时并不会执行，但是却会在下次调用useEffect时执行
+
+### 检查用户停止输入再搜索的实现
+通过在cleanup function中取消上一个timeout，来检查用户的输入频率并决定call
+```jsx
+  useEffect(() => {
+    const search = async () => {
+      const { data } = await axios.get("https://en.wikipedia.org/w/api.php", {
+        params: {
+          action: "query",
+          list: "search",
+          origin: "*",
+          format: "json",
+          srsearch: term,
+        },
+      });
+
+      setResults(data.query.search);
+    };
+    const timeoutId = setTimeout(() => {
+      if (term) {
+        search();
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [term]);
+```
+
+### 使用debounce来检查用户输入，调取api, 并解决results.length warning的问题
+```jsx
+const Search = () => {
+  const [term, setTerm] = useState("programming");
+  const [debouncedTerm, setDebouncedTerm] = useState(term);
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    const timerId = setTimeout(() => {
+      setDebouncedTerm(term);
+    }, 500);
+
+    return () => {
+      clearTimeout(timerId);
+    };
+  }, [term]);
+
+  useEffect(() => {
+    const search = async () => {
+      const { data } = await axios.get("https://en.wikipedia.org/w/api.php", {
+        params: {
+          action: "query",
+          list: "search",
+          origin: "*",
+          format: "json",
+          srsearch: debouncedTerm,
+        },
+      });
+
+      setResults(data.query.search);
+    };
+
+    search();
+  }, [debouncedTerm]);
+
+  const renderedResults = results.map((result, index) => {
+    return (
+      <div className="item" key={index}>
+        <div className="right floated content">
+          <a
+            className="ui button"
+            href={`https://en.wikipedia.org?curid=${result.pageid}`}
+          >
+            Go
+          </a>
+        </div>
+        <div className="content">
+          <div className="header">{result.title}</div>
+
+          <span dangerouslySetInnerHTML={{ __html: result.snippet }}></span>
+        </div>
+      </div>
+    );
+  });
+
+  return (
+    <div>
+      <div className="ui form">
+        <div className="field">
+          <label>Enter Search Tern</label>
+          <input
+            className="input"
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+          ></input>
+        </div>
+      </div>
+      <div className="ui called list">{renderedResults}</div>
+    </div>
+  );
+};
+```
+
+### 三元表达式，写入onclick来控制渲染
+```jsx
+const Dropdown = ({ options, selected, onSelectChange }) => {
+  const [open, setOpen] = useState(false);
+
+  const renderedOptions = options.map((option) => {
+    if (option.value === selected.value) {
+      return null;
+    }
+
+    return (
+      <div key={option.value} onClick={() => onSelectChange(option)}>
+        {option.label}
+      </div>
+    );
+  });
+
+  return (
+    <div className="ui form">
+      <div className="field">
+        <label className="label">Select a Color</label>
+        <div
+          className={`ui selection dropdown ${open ? "visible active" : ""}`}
+          onClick={() => setOpen(!open)}
+        >
+          <i className="dropdown icon"></i>
+          <div className="text">{selected.label}</div>
+          <div className={`menu ${open ? "visible transition" : ""}`}>
+            {renderedOptions}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+```
+
+### EventListeners
+所有EventListener里，addEventListener的优先级最高，最先被执行
+
+### useRef
+使用```ref.current```可以返回当前element的reference,因此可以用来隔绝event listener之间的执行范围，例如
+```jsx
+const Dropdown = ({ options, selected, onSelectChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  useEffect(() => {
+    document.body.addEventListener(
+      "click",
+      (event) => {
+        if (ref.current.contains(event.target)) {
+          return;
+        }
+        setOpen(false);
+      },
+      { capture: true }
+    );
+  }, []);
+
+  const renderedOptions = options.map((option) => {
+    if (option.value === selected.value) {
+      return null;
+    }
+
+    return (
+      <div key={option.value} onClick={() => onSelectChange(option)}>
+        {option.label}
+      </div>
+    );
+  });
+
+  return (
+    <div ref={ref} className="ui form">
+      <div className="field">
+        <label className="label">Select a Color</label>
+        <div
+          className={`ui selection dropdown ${open ? "visible active" : ""}`}
+          onClick={() => setOpen(!open)}
+        >
+          <i className="dropdown icon"></i>
+          <div className="text">{selected.label}</div>
+          <div className={`menu ${open ? "visible transition" : ""}`}>
+            {renderedOptions}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+```
+### 使用三元表达式来 控制一整片JSX的渲染
+```jsx
+const [showDropdown, setShowDropdown] = useState(true);
+return (
+    <div>
+      <button onClick={() => setShowDropdown(!showDropdown)}>
+        Toggle Dropdown
+      </button>
+      {showDropdown ? (
+        <Dropdown
+          selected={selected}
+          onSelectChange={setSelected}
+          options={options}
+        />
+      ) : null}
+    </div>
+  );
+```
+AIzaSyCHUCmpR7cT_yDFHC98CZJy2LTms-IwDlM
+
+### props依然可以在useEffect中调用
+```jsx
+const Convert = ({language, text}) => {
+  useEffect(() =>{
+
+  },[language, text]);
+  return(
+    <div></div>
+  );
+};
+```
+### 熟练async在useEffect中的写法
+```jsx
+useEffect(() => {
+
+    const doTranslation = async () => {
+      const {data} = await axios.post(
+        "https://translation.googleapis.com/language/translate/v2",
+        {},
+        {
+          params: {
+            q: text,
+            target: language.value,
+            key: "AIzaSyCHUCmpR7cT_yDFHC98CZJy2LTms-IwDlM",
+          },
+        }
+      );
+
+      setTranslated(data.data.translationsp[0].translatedText);
+    };
+
+    doTranslation();
+  }, [language, text]);
+```
