@@ -1256,3 +1256,151 @@ return [video, onTermSubmit];
 return {video, onTermSubmit};
 ```
 其中onTermSubmit是function
+
+## Section 15
+npm install -g vercel
+vercel login
+//部署
+vercel
+//重新部署
+vercel --prod
+
+## Section 16 Redux
+### Redux Cycle
+Aciton creator(person drop off the form) => 
+Action(the form) => 
+dispatch(form receiver) =>
+Reducers(departments) =>
+State(compiled department data)
+
+### spread
+```jsx
+return [...oldListOfClaims, action.payload]; 
+```
+等同于返回一个新的array，里面包含了旧的array，以及加入了新的action.payload
+```js
+numbers = [1,2,3];
+[...numbers,4] //[1,2,3,4]
+```
+
+### 参数为undefined时的初始化
+```js
+const claimsHistory = (oldListOfClaims = [], action) => {
+  if (action.type === 'CREATE_CLAIM'){
+    return [...oldListOfClaims, action.payload];  
+  }
+  
+  return oldListOfClaims;
+};
+```
+以上，当oldListOfClaims为undefined时候，会初始化为[]
+
+### filter方法
+```js
+numbers.filter(num => num !== 2) //返回一个新的array,为[1,3]
+```
+可以用filter来删除元素，例如
+```jsx
+const policies = (policies = [], action) => {
+  if(action.type === 'CREATE_POLICY') {
+    return [...policies, action.payload.name];
+  }else if (action.type === 'DELETE_POLICY'){
+    return policies.filter(name => name!== action.payload.name);
+  }
+};
+```
+
+### Reducers
+- Goals: take some existing data, some action, and then modify and return that existing data based upon the contents of an action
+
+### 从代码上理解Redux life cycle：
+Aciton creator(person drop off the form) => 
+```js
+const createPolicy = (name, amount) => {
+  return{
+    //Action
+    type: 'CREATE_POLICY',
+    payload:{
+      name: name,
+      amount: amount
+    }
+  };
+};
+
+const deletePolicy = (name) => {
+  return{
+    type:'DELETE_POLICY',
+    payload:{
+      name: name
+    }
+  };
+};
+
+const createClaim = (name, amount) => {
+  return{
+    type: 'CREATE_CLAIM',
+    payload:{
+      name:name,
+      amount:amount
+    }
+  };
+};
+
+```
+
+Reducers(departments) =>
+```js
+const claimsHistory = (oldListOfClaims = [], action) => {
+  if (action.type === 'CREATE_CLAIM'){
+    return [...oldListOfClaims, action.payload];  
+  }
+  
+  return oldListOfClaims;
+};
+
+const accounting = (money=100,action) => {
+  if(action.type === 'CREATE_CLAIM'){
+    return money - action.payload.amount;
+  }else if(action.type === 'CREATE_POLICY'){
+    return money + action.payload.amount;
+  }
+  
+  return money;
+};
+
+const policies = (policies = [], action) => {
+  if(action.type === 'CREATE_POLICY') {
+    return [...policies, action.payload.name];
+  }else if (action.type === 'DELETE_POLICY'){
+    return policies.filter(name => name!== action.payload.name);
+  }
+  
+  return policies;
+};
+```
+State(compiled department data)
+```js
+const {createStore, combineReducers} = Redux;
+//下面配置的reducer是按照：key:reducer方法名设置的
+const ourDeparments = combineReducers({
+  accounting: accounting,
+  claimsHistory: claimsHistory,
+  policies: policies
+});
+
+const store = createStore(ourDeparments);
+```
+Action(the form) => 
+dispatch(form receiver) =>
+只有通过dispatch action,才能修改state里的数据
+```js
+store.dispatch(createPolicy('Alex',30));
+store.dispatch(createPolicy('Jim',30));
+store.dispatch(createPolicy('Bob',40));
+
+store.dispatch(createClaim('Jim',10));
+
+store.dispatch(deletePolicy('Bob'));
+```
+
+## Section 17 React Redux
