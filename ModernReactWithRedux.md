@@ -1404,3 +1404,24 @@ store.dispatch(deletePolicy('Bob'));
 ```
 
 ## Section 17 React Redux
+npm install --save redux react-redux
+
+Provider
+Connect
+
+### import pattern
+如果导入的是default，可以不用大括号；否则可以加大括号，比如
+```js
+import {selectSong} from '../actions';
+```
+ES6中，如果Key与Value相同，则可以简化
+```js
+export default connect(mapStateToProps, { selectSong: selectSong})(SongList);
+```
+等同于
+```js
+export default connect(mapStateToProps, { selectSong})(SongList);
+```
+### Redux is not magical
+- Redux does not automatically detect action creators being called
+- Redux does not automatically detect a function returning an object that is an 'action'
