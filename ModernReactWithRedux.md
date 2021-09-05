@@ -1996,3 +1996,156 @@ https://github.com/zalmoxisus/redux-devtools-extension
 
 http://localhost:3000/?debug_session=logged_in
 http://localhost:3000/?debug_session=logged_out
+
+## Section 23 Redux Form
+npm install --save redux-form
+https://redux-form.com/8.3.0/
+
+### WireUp Redux Form
+```js
+import { combineReducers } from "redux";
+import { reducer as formReducer } from "redux-form";
+import authReducer from "./authReducer";
+
+export default combineReducers({
+  auth: authReducer,
+  form: formReducer,
+});
+
+```
+### Import redux-form to component
+```js
+// StreamCreate.js
+import {Field, reduxForm } from 'redux-form';
+export default reduxForm({
+  form: 'streamCreate'
+})(StreamCreate);
+```
+### Using Field
+```jsx
+renderInput(formProps) {
+    return <input  onChange={formProps.input.onChange} value={formProps.input.value}>input</input>;
+  }
+
+  render() {
+    return (
+      <form>
+        <Field name="title" component={this.renderInput} />
+        <Field name="description" component={this.renderInput} />
+        <div>StreamCreate</div>
+      </form>
+    );
+  }
+```
+等效于
+```js
+ renderInput({input}) {
+    return <input {...input} />;
+  }
+```
+### Customize Field
+```js
+renderInput({ input, label }) {
+    return (
+      <div className="field">
+        <label>{label}</label>
+        <input {...input} />
+      </div>
+    );
+  }
+
+  render() {
+    return (
+      <form className="ui form">
+        <Field name="title" component={this.renderInput} label="Enter Title" />
+        <Field
+          name="description"
+          component={this.renderInput}
+          label="Enter Description"
+        />
+        <div>StreamCreate</div>
+      </form>
+    );
+  }
+```
+### Handle Submission
+```js
+onSubmit(formValues) {
+  
+  };
+render() {
+    return (
+      <form className="ui form" onSubmit={this.props.handleSubmit(this.onSubmis)}>
+        <Field name="title" component={this.renderInput} label="Enter Title" />
+        <Field
+          name="description"
+          component={this.renderInput}
+          label="Enter Description"
+        />
+        <button className="ui button primary">Submit</button>
+        <div>StreamCreate</div>
+      </form>
+    );
+  }
+```
+
+### Validate Input
+```js
+const validate = (formValues) => {
+  const errors = {};
+  if (!formValues.title) {
+    errors.title = "You must enter a title";
+  }
+
+  if (!formValues.description) {
+    errors.description = "You must enter a description";
+  }
+
+  return errors;
+};
+
+export default reduxForm({
+  form: "streamCreate",
+  validate,
+})(StreamCreate);
+```
+add renderError
+```js
+  renderError = ({ error, touched }) => {
+    if (touched && error) {
+      return (
+        <div className="ui error message">
+          <div className="header">{error}</div>
+        </div>
+      );
+    }
+  };
+
+  renderInput = ({ input, label, meta }) => {
+    const className = `field ${meta.error && meta.touched ? "error" : ""}`;
+    return (
+      <div className={className}>
+        <label>{label}</label>
+        <input {...input} autoComplete="off" />
+        {this.renderError(meta)}
+      </div>
+    );
+  };
+
+  render() {
+    return (
+      <form
+        className="ui form error"
+        onSubmit={this.props.handleSubmit(this.onSubmit)}
+      >
+        <Field name="title" component={this.renderInput} label="Enter Title" />
+        <Field
+          name="description"
+          component={this.renderInput}
+          label="Enter Description"
+        />
+        <button className="ui button primary">Submit</button>
+      </form>
+    );
+  }
+```
