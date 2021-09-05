@@ -1668,3 +1668,69 @@ _.chain(getState().posts)
     .forEach(id=>dispatch(fetchUser(id)))
     .value();
 ```
+
+## Section 20 React Router
+mkdir streams
+npm install --save react-router-dom
+### React Router Family
+React-router: Core navigation lib - we don't install this manually
+react-router-dom: Navigation for dom-based apps (we want this!)
+react-router-native: Navigation for react-native apps
+react-router-redux: Bindings between Redux and React Router (not necessary)
+
+### Route
+```js
+<Route path="/" exact component={pageone} />
+```
+对于一个地址，比如 localhost:3000/page/5,提取的path是"/page/5"，然后比对这个path对应的component，即包含了哪些component，比如 
+```js
+<Route path="/" component={home} />
+<Route path="/page" component={pageone} />
+```
+他会匹配到两个component，然后将对应的都渲染出来   
+只有我们加入exact，即```exact={true}```的简写后，他才会只匹配到home
+
+### Bad Navigation
+- You add an <a /> tag to your application with href='/pagetwo' and click it
+- Your browser makes a request to localhost:3000/pagetwo
+- Development server responds with index.html file
+- Browser receives index.html file, dumps old HTML file it was showing (including all of your React/Redux state data!)
+- index.html file lists our JS files in script tags - browser downloads and executes these scripts
+- Our app starts up
+
+### Router Navigation Process
+- User wants to navigate to another page in our app
+- User clicks a 'Link' tag
+- React Router prevents the browser from navigating to the new page and fetching new index.html file!
+- URL still changes
+- 'History' sees updated URL, takes URL and sends it to BrowserRouter
+- BrowserRouter communicates the URL to Route components
+- Route components rerender to show new set of components
+
+### Different Router Types
+- BrowserRouter: localhost:3000/pagetwo
+  - Uses everything after the TLD (.com, .net) or port as the 'path'
+- HashRouter: localhost:3000/#/pagetwo
+  - Uses everything after a # as the 'path'
+- MemoryRouter: localhost:3000/
+  - Doesn't use the URL to track navigation
+> VS Code中连续多选，ctrl+D
+
+### Link
+通过Link实现导航
+```js
+const Header = () => {
+  return (
+    <div className="ui secondary pointing menu">
+      <Link to="/" className="item">
+        Streamy
+      </Link>
+      <div className="right menu">
+        <Link to="/" className="item">
+          All Streams
+        </Link>
+      </div>
+    </div>
+  );
+};
+```
