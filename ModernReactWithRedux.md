@@ -1734,3 +1734,265 @@ const Header = () => {
   );
 };
 ```
+## Section 21 Authentication
+90189678095-67fmno0ea6jnkglhm53m16qsv9gc0eq6.apps.googleusercontent.com
+https://github.com/google/google-api-javascript-client/blob/master/docs/start.md
+```html
+<script src="https://apis.google.com/js/api.js"></script>
+```
+```
+gapi.auth2.getAuthInstance().signIn()
+gapi.auth2.getAuthInstance().signOut()
+```
+https://github.com/google/google-api-javascript-client
+
+### 获得auth instance，来完成验证
+通过gapi获得auth instance，继而得到sign in状态
+```js
+class GoogleAuth extends React.Component {
+  state = { isSignedIn: null };
+
+  componentDidMount() {
+    window.gapi.load("client:auth2", () => {
+      window.gapi.client
+        .init({
+          clientId:
+            "90189678095-67fmno0ea6jnkglhm53m16qsv9gc0eq6.apps.googleusercontent.com",
+          scope: "email",
+        })
+        .then(() => {
+          this.auth = window.gapi.auth2.getAuthInstance();
+          this.setState({ isSignedIn: this.auth.isSignedIn.get() });
+          this.auth.isSignedIn.listen(this.onAuthChange);
+        });
+    });
+  }
+
+  onAuthChange = () => {
+    this.setState({ isSignedIn: this.auth.isSignedIn.get() });
+  };
+
+  onSignInClick = () => {
+    this.auth.signIn();
+  };
+
+  onSignOutClick = () => {
+    this.auth.signOut();
+  };
+
+  renderAuthButton() {
+    if (this.state.isSignedIn === null) {
+      return null;
+    } else if (this.state.isSignedIn === true) {
+      return (
+        <button onClick={this.onSignOutClick} className="ui red google button">
+          <i className="google icon" />
+          Sign Out
+        </button>
+      );
+    } else {
+      return (
+        <button onClick={this.onSignInClick} className="ui red google button">
+          <i className="google icon" />
+          Sign In With Google
+        </button>
+      );
+    }
+  }
+
+  render() {
+    return <div>{this.renderAuthButton()}</div>;
+  }
+}
+```
+### Redux Setup
+1. 创建actions
+2. 创建reducers
+```js
+//index.js in reducers 
+import { combineReducers } from "redux";
+
+export default combineReducers({
+  replaceMe: () => "hello",
+});
+
+```
+3. 引入library
+```js
+import { Provider } from "react-redux";
+import { createStore} from "redux";
+import reducers from "./reducers";
+```
+4. 创建store
+```js
+const store = createStore(reducers);
+```
+5. 放置provider
+```js
+ReactDOM.render(
+  <Provider store={store}>
+    <App />
+  </Provider>,
+  document.getElementById("root")
+);
+```
+### 使用Redux
+1. 创建actions
+```js
+// index.js in actions
+export const signIn = () => {
+  return {
+    type: "SIGN_IN",
+  };
+};
+
+export const signOut = () => {
+  return {
+    type: "SIGN_OUT",
+  };
+};
+```
+2. GoogleAuth component中引入redux
+- 引入library与action
+```js
+//GoogleAuth.js
+import { connect } from "react-redux";
+import { signIn, signOut } from "../actions";
+
+export default connect(null, { signIn, signOut })(GoogleAuth);
+```
+3. component 改造并加入action creator
+```js
+onAuthChange = (isSignedIn) => {
+    if (isSignedIn) {
+      this.props.signIn();
+    } else {
+      this.props.signOut();
+    }
+  };
+
+ componentDidMount() {
+    window.gapi.load("client:auth2", () => {
+      window.gapi.client
+        .init({
+          clientId:
+            "90189678095-67fmno0ea6jnkglhm53m16qsv9gc0eq6.apps.googleusercontent.com",
+          scope: "email",
+        })
+        .then(() => {
+          this.auth = window.gapi.auth2.getAuthInstance();
+          this.onAuthChange(this.auth.isSignedIn.get());
+          //listen and wait for the change of isSignedIn status in the furture
+          this.auth.isSignedIn.listen(this.onAuthChange);
+        });
+    });
+  }
+```
+4. 创建reducer
+```js
+//authReducer.js
+const INITIAL_STATE = {
+  isSignedIn: null
+
+};
+
+export default (state = INITIAL_STATE, action) => {
+  switch (action.type) {
+    case "SIGN_IN":
+      return {...state, isSignedIn: true};
+    case "SIGN_OUT":
+      return {...state, isSignedIn: false};
+    default:
+      return state;
+  }
+};
+```
+5. 导入新创建的reducer
+```js
+//index.js in reducers
+import authReducer from "./authReducer";
+
+export default combineReducers({
+  auth: authReducer,
+});
+```
+6. component改造并加入reducer
+- 加入mapStateToProps
+```js
+//GoogleAuth.js
+const mapStateToProps = (state) => {
+  return { isSignedIn: state.auth.isSignedIn };
+};
+
+export default connect(mapStateToProps, { signIn, signOut })(GoogleAuth);
+```
+- 使用props，改变逻辑
+```js
+  renderAuthButton() {
+    if (this.props.isSignedIn === null) {
+      return null;
+    } else if (this.props.isSignedIn === true) {
+      return (
+        <button onClick={this.onSignOutClick} className="ui red google button">
+          <i className="google icon" />
+          Sign Out
+        </button>
+      );
+    } else {
+      return (
+        <button onClick={this.onSignInClick} className="ui red google button">
+          <i className="google icon" />
+          Sign In With Google
+        </button>
+      );
+    }
+  }
+```
+### 创建Type.js来统一对type的引用
+为了避免action与reducer之间type容易出现的拼写错误，可以在action下，建立类型的js文件，然后分别在action与reducer中引用变量
+```js
+//type.js in actoins
+export const SIGN_IN = "SIGN_IN";
+export const SIGN_OUT = "SIGN_OUT";
+```
+```js
+//index.js in actions
+import { SIGN_IN, SIGN_OUT } from "./type";
+
+export const signIn = () => {
+  return {
+    type: SIGN_IN,
+  };
+};
+
+export const signOut = () => {
+  return {
+    type: SIGN_OUT,
+  };
+};
+
+```
+```js
+//authReducer.js in reducers
+import { SIGN_IN, SIGN_OUT } from "../actions/type";
+const INITIAL_STATE = {
+  isSignedIn: null,
+};
+
+export default (state = INITIAL_STATE, action) => {
+  switch (action.type) {
+    case SIGN_IN:
+      return { ...state, isSignedIn: true };
+    case SIGN_OUT:
+      return { ...state, isSignedIn: false };
+    default:
+      return state;
+  }
+};
+
+```
+## Section 22 Redux dev Tools
+https://github.com/zalmoxisus/redux-devtools-extension
+
+http://localhost:3000/?debug_session=logged_in
+http://localhost:3000/?debug_session=logged_out
