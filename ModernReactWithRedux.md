@@ -1425,3 +1425,246 @@ export default connect(mapStateToProps, { selectSong})(SongList);
 ### Redux is not magical
 - Redux does not automatically detect action creators being called
 - Redux does not automatically detect a function returning an object that is an 'action'
+
+## Section 18: Redux thunk
+npm install --save redux react-redux axios redux-thunk
+redux-thunk: Middleware to help us make requests in a redux application
+
+### General Data Loading with Redux
+- Component gets rendered onto the screen
+- Component's 'componentDidMount' lifecycle method gets called
+- We call action creator from 'componentDidMount'
+> Components are generally responsible for fetching data they need by calling an action creator
+- Action creator runs code to make an API request
+- API responds with data
+- Action creator returns an 'action' with the fetched data on the 'payload' property
+> Action creators are responsible for making API requests, This is where Redux-Thunk comes into play
+- Some reducer sees the action, returns the data off the 'payload'
+- Because we generated some new state object, redux/react-redux cause our React app to be rerendered
+> We get fetched data into a component by generating new state in our redux store, then getting that into our component through mapStateToProps
+
+### Rules on Action Creator
+Action creator must return plain objects, no async actions hould be presented
+
+Normal Rules:
+- Action Creators must return action objects
+- Actions must have a type property
+- Actions can optionally have a 'payload'
+
+### Rules with Redux Thunk
+- Action Creators can return action objects
+- Action Creators can return functions!
+- If an action object gets returned, it must have a type
+- If an action object gets returned, it can optionally have a 'payload'
+
+github.com/reduxjs/redux-thunk
+
+### hookup react-thunk
+```jsx
+import { createStore, applyMiddleware} from "redux";
+import thunk from 'redux-thunk';
+
+const store = createStore(reducers, applyMiddleware(thunk));
+
+ReactDOM.render(
+  <Provider store={store}>
+    <App />
+  </Provider>,
+  document.getElementById("root")
+);
+```
+
+### arrow function简写
+```jsx
+export const fetchPosts = () => {
+  return async (dispatch) =>{
+    const response = await jsonplaceholder.get("./posts");
+
+    dispatch({ type: "FETCH_POSTS", payload: response });
+  };
+};
+
+```
+可以简化为
+```jsx
+export const fetchPosts = () => async (dispatch) => {
+  const response = await jsonplaceholder.get("./posts");
+
+  dispatch({ type: "FETCH_POSTS", payload: response });
+};
+```
+
+## Section 19
+### Rules of Reducers
+- Must return any value besides 'undefined'
+- Produces 'state', or data to be used inside of your app using only previous state and the action
+- Must not return reach 'out of itself' to decide what value to return  (reducers are pure)
+- MISLEADING >> Must not mutate its input 'state' argument
+  - mutate:edit, change
+  ```js
+  export default (state,action) =>{
+    //bad
+    state[0] = 'sa'
+    state.pup()
+    state.push()
+    state.name='same'
+    state.age=30
+  }
+  ``` 
+
+### Equality of Arrays and Objects
+```js
+const numbers = [1,2,3];
+number === [1,2,3] //false
+```
+array类型比较的是reference
+
+### Safeupdate in state
+#### In array
+Removing an element from an array
+- state.pop() -> state.filter(element => element !== 'hi')
+Adding an element to an array
+- state.push('hi') -> [ ...state, 'hi' ]
+Replacing an element in an array
+- state[0] = 'hi' -> state.map(el => el === 'hi' ? 'bye' : el)
+
+#### In an object
+Updating a property in an object
+- state.name = 'Sam' -> { ...state, name: 'Sam' }
+Adding a property to an object
+- state.age = 30 -> { ...state, age: 30 }
+Removing a property from an object
+- delete state.name ->(不太推荐) { ...state, age: undefined } ->lodashi library: _.omit(state, 'age')
+
+### Reducer的写法
+使用if
+```js
+export default (state=[], action) => {
+  if(action.type === 'FETCH_POST'){
+    return action.payload;
+  }
+
+  return state;
+};
+```
+使用switch
+```js
+export default (state = [], action) => {
+  switch (action.type) {
+    case "FETCH_POSTS":
+      return action.payload;
+    default:
+      return state;
+  }
+};
+```
+### 从mapStateToProps中获取单个user
+如果不想mapStateToProps只是拿取所有的user，而是过滤获得单个user，可以使用如下做法
+```js
+class UserHeader extends React.Component {
+  componentDidMount() {
+    this.props.fetchUser(this.props.userId);
+  }
+  render() {
+    const { user } = this.props;
+    if (!user) {
+      return null;
+    }
+    return <div>{user.name}</div>;
+  }
+}
+
+const mapStateToProps = (state, ownProps) => {
+  return { user: state.users.find((user) => user.id === ownProps.userId) };
+};
+
+export default connect(mapStateToProps, { fetchUser })(UserHeader);
+
+```
+### 解决每一个user都被over fetching的方法
+#### 使用memoize
+该方法虽然只会对相同参数的方法只执行一次api call，但是当服务器端该参数对应的数据发生变动时，无法在本地客户端进行更新
+```js
+function getUser(id) {
+    fetch(id)；
+    return 'make a request'
+} 
+
+const memGetUser = _.memoize(getUser)
+//memoize会wrap getUser,并且执行call
+memoizedGetUser(3)
+//会返回同一个结果，但是因为参数相同，memoize并不会再次执行call
+memoizedGetUser(3)
+```
+npm install --save lodash
+```js
+export const fetchUser = function (id) { 
+  return async function(dispatch) {
+  const response = await jsonplaceholder.get(`/users/${id}`);
+
+  dispatch({ type: "FETCH_USER", payload: response.data });
+  };
+};
+```
+```js
+export const fetchUser = (id) => (dispatch) => {
+  _fetchUser(id, dispatch);
+};
+
+const _fetchUser = _.memoize(async (id, dispatch) => {
+  const response = await jsonplaceholder.get(`/users/${id}`);
+
+  dispatch({ type: "FETCH_USER", payload: response.data });
+});
+```
+#### 使用lodash来获取unique user id在一个数组中
+```js
+const userIds = _.uniq(_.map(getState().posts, "userId"));
+```
+上面_.map 的方法，获取了posts中所有的userId，并返回到一个array里
+#### forEach的方法中无法使用Async
+```js
+userIds.forEach(id=>dispatch(fetchUser(id)));
+```
+上面的可以改为
+```js
+await Promise.all(userIds.map(id=>dispatch(fetchUser(id))))
+```
+#### 使用Action Creators in Action Creators!
+```js
+import _ from "lodash";
+import jsonplaceholder from "../apis/jsonPlaceholder";
+
+export const fetchPostsAndUser = () => async (dispatch, getState) => {
+  await dispatch(fetchPosts());
+  const userIds = _.uniq(_.map(getState().posts, "userId"));
+  userIds.forEach((id) => dispatch(fetchUser(id)));
+};
+
+export const fetchPosts = () => async (dispatch) => {
+  const response = await jsonplaceholder.get("/posts");
+
+  dispatch({ type: "FETCH_POSTS", payload: response.data });
+};
+
+export const fetchUser = (id) => async (dispatch) => {
+  const response = await jsonplaceholder.get(`/users/${id}`);
+
+  dispatch({ type: "FETCH_USER", payload: response.data });
+};
+```
+#### lodash chain
+```js
+const userIds = _.uniq(_.map(getState().posts, "userId"));
+  userIds.forEach((id) => dispatch(fetchUser(id)));
+```
+可以使用lodash chain将以上改写，注意
+- chain()里填的参数将作为参数传给下一层调用的方法
+- chain的最末尾需要 .value()方法来激活整个chain的执行
+```js
+_.chain(getState().posts)
+    .map('userId')
+    .uniq()
+    .forEach(id=>dispatch(fetchUser(id)))
+    .value();
+```
