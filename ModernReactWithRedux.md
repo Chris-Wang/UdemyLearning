@@ -1581,6 +1581,7 @@ const mapStateToProps = (state, ownProps) => {
 export default connect(mapStateToProps, { fetchUser })(UserHeader);
 
 ```
+mapStateToProps有两个参数，一个是state，一个是component可以拿到的ownProps
 ### 解决每一个user都被over fetching的方法
 #### 使用memoize
 该方法虽然只会对相同参数的方法只执行一次api call，但是当服务器端该参数对应的数据发生变动时，无法在本地客户端进行更新
@@ -2149,3 +2150,128 @@ add renderError
     );
   }
 ```
+
+## Section 24
+https://www.npmjs.com/package/json-server
+mkdir api
+npm init
+npm install --save json-server
+### Wiring up redux-form with connect
+```js
+const formWrapped = reduxForm({
+  form: "streamCreate",
+  validate,
+})(StreamCreate);
+
+export default connect(null, { createStream })(formWrapped);
+```
+### key interpolaton syntax
+```js
+const animals ={cat:'meow', dog:'bark'};
+const animal = 'lion';
+const sound = 'roar';
+{...animals, [animal]:sound}
+```
+### Object-based reducers
+in array-based reducers,it is 
+```js
+case EDIT_STREAM:
+    return state.map(stream=>{
+      if(stream.id === action.payload.id){
+        return action.payload;
+      }else{
+        return stream;
+      }
+    })
+```
+in object-based reducers
+使用key interpolaton syntax
+```js
+case EDIT_STREAM:
+  return {...state,[action.payload.id]:action.payload};
+```
+以上等同于:
+```js
+case EDIT_STREAM:
+  const newState = {...state};
+  newState[action.payload.id] = action.payload;
+  return newState;
+```
+
+### lodash mapKeys
+```js
+case FETCH_STREAMS:
+      return {...state, ..._.mapKeys(action.payload,'id')};
+```
+### object to array
+```js
+const mapStateToProps = (state) => {
+  return { streams: Object.values(state.streams) };
+};
+```
+### creating a browser history object
+```js
+//history.js
+import { createBrowserHistory } from 'history'; 
+export default createBrowserHistory();
+```
+```js
+//App.js
+import { Router, Route } from "react-router-dom";
+import history from "../history";
+const App = () => {
+  return (
+    <div className="ui container">
+      <Router history={history}>
+        <>
+          <Header />
+          <Route path="/" exact component={StreamList} />
+          <Route path="/stream/new" exact component={StreamCreate} />
+          <Route path="/stream/edit/:id" exact component={StreamEdit} />
+          <Route path="/stream/delete" exact component={StreamDelete} />
+          <Route path="/stream/show" exact component={StreamShow} />
+        </>
+      </Router>
+    </div>
+  );
+};
+```
+以上```/stream/edit/```后面跟的：表示跟随的为变量
+
+### 以路径作为props，拿到id的方法
+```js
+const mapStateToProps = (state, ownProps) => {
+  return { stream: state.streams[ownProps.match.params.id] };
+};
+```
+
+### initial value of Redux Form
+initialValue是redux form的关键字，直接定义了form里field的初始值，注意的是，里面object要跟form下field里定义的一一对应
+```js
+  render() {
+    if (!this.props.stream) {
+      return <div>Loading...</div>;
+    }
+    return (
+      <div>
+        <h3>Edit a Stream</h3>
+        <StreamForm initialValues={{title:this.props.stream.title, description:this.props.stream.description}} onSubmit={this.onSubmit} />
+      </div>
+    );
+  }
+```
+以上写法还可使用lodash做进一步简化：pick将object里需要的属性拿出来，返回一个新的object
+```js
+        <StreamForm
+          initialValues={_.pick(this.props.stream, "title", "description")}
+          onSubmit={this.onSubmit}
+        />
+```
+### PUT VS PATCH
+PUT会把body里面的东西完全替换掉原来的内容
+PATCH只会在原来的数据基础上update/overwrite body里的部分
+## Section 27
+
+### Props vs Context
+- Props System: Gets data from a parent component to a direct child component
+- Context System: Gets data from a parent component to any nested child component
