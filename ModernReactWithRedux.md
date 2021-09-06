@@ -2270,6 +2270,101 @@ initialValue是redux form的关键字，直接定义了form里field的初始值�
 ### PUT VS PATCH
 PUT会把body里面的东西完全替换掉原来的内容
 PATCH只会在原来的数据基础上update/overwrite body里的部分
+
+## Section 25 React Portals
+### Modal
+1. src下面建立Modal.js
+```js
+import React from "react";
+import ReactDOM from "react-dom";
+
+const Modal = (props) => {
+  return ReactDOM.createPortal(
+    <div className="ui dimmer modals visible active">
+      <div className="ui standard modal visible active">Hello</div>
+    </div>,
+    document.querySelector("#modal")
+  );
+};
+
+export default Modal;
+
+```
+2. 在component中直接使用
+```js
+import React from "react";
+import Modal from "../../Modal";
+
+const StreamDelete = () => {
+  return (
+    <div>
+      StreamDelete
+      <Modal />
+    </div>
+  );
+};
+
+export default StreamDelete;
+
+```
+### 冒泡事件
+当我们在一个child element中触发事件时，它会不断冒泡该事件，一直到达顶层。为防止这种事情，我们可以使用stopPropagation来停止冒泡
+```js
+import React from "react";
+import ReactDOM from "react-dom";
+import history from "./history";
+
+const Modal = (props) => {
+  return ReactDOM.createPortal(
+    <div
+      className="ui dimmer modals visible active"
+      onClick={() => history.push("/")}
+    >
+      <div onClick={(e)=>e.stopPropagation()}className="ui standard modal visible active">
+        <div className="header">Delete Stream</div>
+        <div className="content">Are you sure to delete?</div>
+        <div className="actions">
+          <button className="ui primary button">Delete</button>
+          <button className="ui button">Cancel</button>
+        </div>
+      </div>
+    </div>,
+    document.querySelector("#modal")
+  );
+};
+
+export default Modal;
+```
+
+### onClick方法中调用action creator
+```js
+<button onClick={this.props.deleteStream} className="ui button negative">Delete</button>
+```
+上面这种写法，会把整个reference传给deleteStream
+```js
+<button onClick={this.props.deleteStream(id)} className="ui button negative">Delete</button>
+```
+上面这种写法, 在render这个button的时候，会直接执行action
+正确写法为
+```js
+renderAction = () => {
+    const { id } = this.props.match.params;
+    return (
+      <>
+        <button
+          onClick={() => this.props.deleteStreams(id)}
+          className="ui button negative"
+        >
+          Delete
+        </button>
+        <Link to="/" className="ui button">
+          Cancel
+        </Link>
+      </>
+    );
+  };
+```
+
 ## Section 27
 
 ### Props vs Context
