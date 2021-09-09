@@ -319,5 +319,100 @@ it("model instance update set and save", (done) => {
       });
   }
 ```
+
+## Section 7:Mongo Operators
+https://docs.mongodb.com/manual/reference/operator/update/
+1. Update Schema
+```jsx
+const UserSchema = new Schema({
+  name: String,
+  postCount: Number
+});
+```
+2. Using inc operator
+$inc:{想要更新的key:该key对应value增加的值}
+```js
+User.updateOne({ name: "Joe"},{$inc:{postCount:1}});
+```
+3. Updating assert
+```js
+  it("A user can have their postCount incremented", (done) => {
+    User.updateOne({ name: "Joe" }, { $inc: { postCount: 1 } })
+      .then(() => User.findOne({ name: "Joe" }))
+      .then((user) => {
+        assert(user.postCount === 1);
+        done();
+      });
+  });
+```
+### Mongoose Validatation
+1. Upating Schema
+```js
+const UserSchema = new Schema({
+  name: {
+    type: String,
+    required:[true, 'Name is required']
+  },
+  postCount: Number,
+});
+```
+requied的第二个参数为，验证失败时的信息
+2. 添加validate
+#### validateSync VS validate
+validateSync是一个sync process
+```js
+const result = user.validateSync();
+const {message} = result.errors.name;
+```
+我们比较关心的是，其中message的值
+
+3. 添加assert
+```js
+  it("requires a user name", (done) => {
+    const user = new User({ name: undefined });
+    const result = user.validateSync();
+    const { message } = result.errors.name;
+
+    assert(message === "Name is required");
+    done();
+  });
+```
+### Mongoose Validatation Fucntion
+1. 更新user schema
+添加validator,与message
+```js
+const UserSchema = new Schema({
+  name: {
+    type: String,
+    validate: {
+      validator:(name) => name.length>2,
+      message:"Name must be longer than 2 chararaters"
+    },
+    required: [true, "Name is required"],
+  },
+  postCount: Number,
+});
+```
+2.添加vaildate与assert
+```js
+it("requires a user's name longer than 2 charaters", (done) => {
+    const user = new User({ name: "Ai" });
+    const result = user.validateSync();
+    const { message } = result.errors.name;
+    assert(message === "Name must be longer than 2 chararaters");
+    done();
+  });
+```
+### Handling Failed Inserts
+```js
+it("disallows invalid records from being saved", (done) => {
+    const user = new User({ name: "AI" });
+    user.save().catch((result) => {
+      const { message } = result.errors.name;
+      assert(message === "Name must be longer than 2 chararaters");
+      done();
+    });
+  });
+```
 ## Section 12: Putting Your Skills to the Test
 npm install
