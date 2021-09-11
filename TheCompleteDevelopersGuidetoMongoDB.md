@@ -414,5 +414,267 @@ it("disallows invalid records from being saved", (done) => {
     });
   });
 ```
+
+## Section 8: Handling Relational Data
+1. Create Post Schema
+```js
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
+
+const PostSchema = new Schema({
+  title: String,
+  content: String,
+});
+
+module.export = PostSchema;
+```
+2. Add Test
+```js
+const assert = require("assert");
+const User = require("../src/user");
+
+describe("Subdocuments", () => {
+  it("can create a subdocuments", (done) => {
+    const joe = new User({ name: "Joe", posts: [{ title: "PostTitle" }] });
+
+    joe
+      .save()
+      .then(() => User.findOne({ name: "Joe" }))
+      .then((user) => {
+        assert(user.posts[0].title === "PostTitle");
+        done();
+      });
+  });
+});
+
+```
+### Add subdocuments
+```js
+    joe
+      .save()
+      .then(()=>User.findOne({ name: "Joe" })).then((user)=>{
+        user.posts.push({title:'New Post'});
+        user.save();
+      })
+```
+### Remove subdocuments
+使用remove()方法来直接移除subdocuments，因为需要save（）才会向mongo发送请求，所以可以直接调用
+```js
+joe
+      .save()
+      .then(() => User.findOne({ name: "Joe" }))
+      .then((user) => {
+        user.posts[0].remove();
+        return user.save();
+      })
+```
+### Virtural type
+it前面加x，将不会在mocha里进行
+1. 添加virtual property 在model里
+```js
+UserSchema.virtual("postCount").get(function(){
+  return this.posts.length;
+});
+```
+2. 添加Test
+```js
+describe("Virtual Types", () => {
+  it("postCount return number of posts", (done) => {
+    const joe = new User({
+      name: "Joe",
+      posts: [{ titel: "PostTitle" }],
+    });
+    joe
+      .save()
+      .then(() => User.findOne({ name: "Joe" }))
+      .then((user) => {
+        assert(joe.postCount === 1);
+        done();
+      });
+  });
+});
+```
+>注意这里没有用箭头函数，不然this会绑定整个User.js
+
+## Section 9: Thinking About Schema Design
+### Nested data
+1.使用objectId与ref作为subdocuments, 创建与更新Schema
+需要注意的是，ref跟的是下面的'user'
+```js
+//create model
+const User = mongoose.model("user", UserSchema);
+```
+```js
+const mongoose = require("mongoose");
+const PostSchema = require("./post");
+const Schema = mongoose.Schema;
+
+//create schema
+const UserSchema = new Schema({
+  name: {
+    type: String,
+    validate: {
+      validator: (name) => name.length > 2,
+      message: "Name must be longer than 2 chararaters",
+    },
+    required: [true, "Name is required"],
+  },
+  posts: [PostSchema],
+  likes: Number,
+  blogPosts: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "blogPosts",
+    },
+  ],
+});
+
+//add virtual properties
+UserSchema.virtual("postCount").get(function () {
+  return this.posts.length;
+});
+
+//create model
+//register model as 'user'
+const User = mongoose.model("user", UserSchema);
+
+//export model
+module.exports = User;
+```
+```js
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
+
+const BlogPostSchema = new Schema({
+  title: String,
+  conetent: String,
+
+  comments: [{ type: Schema.Types.ObjectId, ref: "comment" }],
+});
+
+const BlogPost = mongoose.model("blogPost", BlogPostSchema);
+
+module.exports = BlogPost;
+```
+```js
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
+
+const CommentSchema = new Schema({
+  content: String,
+  user: {
+    type: Schema.Types.ObjectId,
+    ref: "user",
+  },
+});
+
+const Comment = mongoose.model("comment", CommentSchema);
+module.exports = Comment;
+```
+2. 更新test helper
+collection无法同时drop
+```js
+
+```
+
+3. 初始化model，兼wiring up
+注意wiring up, blogPost to user的时候，同样使用的是push方法，但是这样mongo会自动识别里面的id，做wiring up;   
+同理 comment.user= joe
+```js
+    joe = new User({ name: "Joe" });
+    blogPost = new BlogPost({
+      title: "JS is Great",
+      content: "Yes, it really is",
+    });
+    comment = new Comment({ content: "Congrats on great post" });
+
+    joe.blogPosts.push(blogPost);
+    blogPost.comments.push(comment);
+    comment.user = joe;
+```
+4. 使用Promise.all来实现所有数据储存
+```js
+  beforeEach((done) => {
+    joe = new User({ name: "Joe" });
+    blogPost = new BlogPost({
+      title: "JS is Great",
+      content: "Yes, it really is",
+    });
+    comment = new Comment({ content: "Congrats on great post" });
+
+    joe.blogPosts.push(blogPost);
+    blogPost.comments.push(comment);
+    comment.user = joe;
+
+    Promise.all([joe.save(),blogPost.save(),comment.save()]).then(()=>{
+      done();
+    });
+  });
+```
+
+5. 使用it.only，仅作一项测试
+```js
+  it.only("save a relation", (done) => {
+    User.findOne({ name: "Joe" }).then((user) => {
+      console.log(user);
+      done();
+    });
+  })
+```
+> ```User.findOne({name: 'Joe'})```仅仅返回了一个query，只有后面跟```exec()```或者```then()```才能够执行这个query
+6. 使用populate，加载一层associatioin
+```js
+User.findOne({ name: "Joe" })
+      .populate("blogPosts")
+      .then((user) => {
+        console.log(user);
+        done();
+      });
+```
+注意这里populate里面跟的key一定是user model里的attribute;  
+populate只能读取一层关系，并不能更深入的读取;
+7. 添加assert,判单blogPosts读取情况
+```js
+  it("save a relation", (done) => {
+    User.findOne({ name: "Joe" })
+      .populate("blogPosts")
+      .then((user) => {
+        assert(user.blogPosts[0].title === "JS is Great");
+        done();
+      });
+  });
+```
+### 读取全部relation关系
+populate里面还可以跟configuration，即path与populate
+path跟的key即为user里的attribute
+populate跟的是，通过path fetch出的blogPosts再做一次populate
+model跟的是对应的model
+```js
+  it("save a full relation graph", (done) => {
+    User.findOne({ name: "Joe" })
+      .populate({
+        path: "blogPosts",
+        populate: {
+          path: "comments",
+          model: "comment",
+          populate: {
+            path: "user",
+            model: "user",
+          },
+        },
+      })
+      .then((user) => {
+        assert(user.name === "Joe");
+        assert(user.blogPosts[0].title === "JS is Great");
+        assert(
+          user.blogPosts[0].comments[0].content === "Congrats on great post"
+        );
+        assert(user.blogPosts[0].comments[0].user.name === "Joe");
+
+        done();
+      });
+  });
+```
+
 ## Section 12: Putting Your Skills to the Test
 npm install
