@@ -676,5 +676,24 @@ model跟的是对应的model
   });
 ```
 
+## Section 10: Mongoose Middleware
+Middleware:
+run before or after an event
+1. Model里添加pre,来调取association
+注意：像virutal里一样，这里传入的function是非箭头函数写法的
+```js
+UserSchema.pre('remove',function () {
+  const BlogPost = mongoose.model('blogPost');
+})
+```
+### Operator: $in
+Go through blogPosts, 拿到每一个id 
+```js
+  const BlogPost = mongoose.model('blogPost');
+  BlogPost.remove({_id:{$in:this.blogPosts}});
+```
+
 ## Section 12: Putting Your Skills to the Test
 npm install
+
+## Section 14: MongoDB with Node and Express
