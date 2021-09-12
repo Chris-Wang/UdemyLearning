@@ -917,3 +917,159 @@ function createArtist() {
 }
 ```
 ## Section 14: MongoDB with Node and Express
+npm install --save mongoose express mocha nodemon
+Node: engine for running Javascript outside of a browser enviroment. Can work with HTTP requests.
+Express: framework to simplify working with HTTP requests.
+
+### Create app with express
+```js
+const expree = require("express");
+
+const app = express();
+
+module.exports = app;
+```
+### create index.js using app
+```js
+//index.js
+const app = require("./app");
+
+app.listen(3050, () => {
+  console.log("Runing on 3050");
+});
+
+```
+### handle http request with Express
+你在浏览器地址栏输入的，都是发送的get请求
+```js
+//app.js
+const express = require("express");
+
+const app = express();
+
+// Watch for incoming requests of method GET to the route http://localhost:3050/api
+app.get("/api", (req, res) => {
+  res.send({ hi: "there" });
+});
+
+module.exports = app;
+```
+### Mocha in Express
+npm install --save supertest
+Create app.test.js
+```js
+const assert = require("assert");
+const request = require("supertest");
+const app = require("../app");
+
+describe("The express app", () => {
+  it("handles a GET request", (done) => {
+    request(app)
+      .get("/api")
+      .end((err, response) => {
+        assert(response.body.hi === "there");
+        done();
+      });
+  });
+});
+```
+supertest, 首先绑定了app，然后再使用了get方法发送/api请求
+### 添加routes
+```js
+//routes.js
+module.exports = (app) =>{
+
+  app.get("/api", (req, res) => {
+    res.send({ hi: "there" });
+  });
+};
+```
+更新app.js
+```js
+const express = require("express");
+const routes = require('./routes/routes');
+const app = express();
+
+routes(app);
+
+module.exports = app;
+```
+### 添加controller
+```js
+greeting(req, res){
+  }
+```
+等效于
+```js
+greeting: function(req, res){}
+```
+完成整个controller
+```js
+//drivers_controller.js
+module.exports = {
+  greeting(req, res) {
+    res.send({ hi: "there" });
+  },
+};
+```
+### refactor routes
+```js
+//routes.js
+const DriverController = require("../controllers/drivers_controller");
+
+module.exports = (app) => {
+  app.get("/api", DriverController.greeting);
+};
+```
+### add driver model
+```js
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
+
+const DriverSchema = new Schema({
+  email: {
+    type: String,
+    required: true,
+  },
+  driving: {
+    type: Boolean,
+    default: false,
+  },
+});
+
+const Driver = mongoose.model("driver", DriverSchema);
+module.exports = Driver;
+```
+### BodyParser
+npm install --save body-parser
+add bodyParser to app.js
+```js
+const express = require("express");
+const routes = require("./routes/routes");
+const bodyParser = require('body-parser');
+const app = express();
+
+app.use(bodyParser.json());
+routes(app);
+
+module.exports = app;
+
+```
+### send body with POST
+```js
+//drivers_controller_test.js
+const assert = require("assert");
+const request = require("supertest");
+const app = require("../../app");
+
+describe("Driver Controller", () => {
+  it("Post to /api/drivers creates a new driver", (done) => {
+    request(app)
+      .post("/api/drivers")
+      .send({ email: "test@test.com" })
+      .end(() => {
+        done();
+      });
+  });
+});
+```
