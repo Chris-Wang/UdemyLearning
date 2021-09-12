@@ -687,13 +687,233 @@ UserSchema.pre('remove',function () {
 })
 ```
 ### Operator: $in
-Go through blogPosts, 拿到每一个id 
+Go through blogPosts, 拿到每一个id，并删除
 ```js
   const BlogPost = mongoose.model('blogPost');
   BlogPost.remove({_id:{$in:this.blogPosts}});
 ```
+## Section 11: Handling Big Collections with Pagination
+skip: skip the first N records
+limit: limit the number of result of query 
+1. find all user
+```js
+User.find({})
+```
+2. skip first user, and limit the number of 2
+```js
+User.find({}).skip(1).limit(2)
+```
+3. add sort modifier
+按照key:name的升序排列，如果是逆序排列，则name:2
+```js
+User.find({})
+      .sort({ name: 1 })
+      .skip(1)
+      .limit(2)
+```
 
 ## Section 12: Putting Your Skills to the Test
 npm install
+### 创建artist, album model
+```js
+//album.js
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
 
+const AlbumSchema = new Schema({
+  title: String,
+  date: Date,
+  copiesSold: Number,
+  numberTracks: Number,
+  image: String,
+  revenue: Number,
+});
+
+module.exports = Album;
+```
+这里需要注意，因为album本身只是schema，所以不需要注册model
+```js
+//artist.js
+// Todo: Create Artist Model
+const mongoose = require("mongoose");
+const AlbumSchema = require("./album");
+const Schema = mongoose.Schema;
+
+const ArtistSchema = new Schema({
+  name: String,
+  age: Number,
+  yearsActive: Number,
+  image: String,
+  genre: String,
+  website: String,
+  netWorth: Number,
+  labelName: String,
+  retired: Boolean,
+  ablums: [AlbumSchema],
+});
+
+const Artist = mongoose.model("artist", ArtistSchema);
+
+module.exports = Artist;
+```
+### 查找Artist
+```js
+const Artist = require("../models/artist");
+
+/**
+ * Finds a single artist in the artist collection.
+ * @param {string} _id - The ID of the record to find.
+ * @return {promise} A promise that resolves with the Artist that matches the id
+ */
+module.exports = (_id) => {
+  //return Artist.findOne({ _id: _id });
+  return Artist.findById(_id);
+};
+```
+### 创建Artist
+注意下面直接传了整个props进去
+```js
+const Artist = require("../models/artist");
+module.exports = (artistProps) => {
+  const artist = new Artist(artistProps);
+  return artist.save();
+};
+```
+### 删除Artist
+注意这种直接用model删除的写法，效率更高
+```js
+const Artist = require("../models/artist");
+
+module.exports = (_id) => {
+  return Artist.remove({_id});
+};
+```
+### 编辑Artist
+```js
+const Artist = require("../models/artist");
+
+module.exports = (_id, artistProps) => {
+  // return Artist.findByIdAndUpdate(_id, artistProps);
+  return Artist.update({_id}, artistProps);
+};
+```
+### 按照格式，返回大小值
+```js
+const Artist = require("../models/artist");
+
+/**
+ * Finds the lowest and highest age of artists in the Artist collection
+ * @return {promise} A promise that resolves with an object
+ * containing the min and max ages, like { min: 16, max: 45 }.
+ */
+module.exports = () => {
+  const minQuery = Artist.find({})
+    .sort({ age: 1 })
+    .limit(1)
+    .then((artists) => artists[0].age);
+  const maxQuery = Artist.find({})
+    .sort({ age: -1 })
+    .limit(1)
+    .then((artists) => artists[0].age);
+
+  return Promise.all([minQuery, maxQuery]).then((result) => {
+    return { min: result[0], max: result[1] };
+  });
+};
+```
+### 初始化对象，并向里面注入key, value pair
+```js
+const sortOrder = {};
+const sortProperty = 'name';
+sortOrder[sortProperty] = 1;
+console.log(sortOrder); //object{name:1}
+```
+相同的es6写法可以是
+```js
+{[sortProperty]:1}
+```
+### 使用offset，与limit调整sort结果window
+```js
+module.exports = (criteria, sortProperty, offset = 0, limit = 20) => {
+  const query = Artist.find({})
+    .sort({ [sortProperty]: 1 })
+    .skip(limit * offset)
+    .limit(limit);
+  return Promise.all([query, Artist.count()]).then((results) => {
+      return { all: results[0], count: results[1], offset: offset, limit: limit };
+    });
+}
+```
+### $gte, $lte 结合，实现多重filter
+```js
+const query = Artist.find(buildQuery(criteria))
+    .sort({ [sortProperty]: 1 })
+    .skip(offset)
+    .limit(limit);
+
+const buildQuery = (criteria) => {
+  const query = {};
+
+  console.log(criteria);
+  if (criteria.age) {
+    query.age = {
+      $gte: criteria.age.min,
+      $lte: criteria.age.max,
+    };
+  }
+
+  if (criteria.yearsActive) {
+    query.yearsActive = {
+      $gte: criteria.yearsActive.min,
+      $lte: criteria.yearsActive.max,
+    };
+  }
+
+  return query;
+};
+```
+### Add text indexes
+mongo
+use upstar_music
+show dbs
+db.artists.createIndex({name:"text"})
+### $text for text search
+```js
+if (criteria.name) {
+    query.$text = { $search: criteria.name };
+  }
+```
+### Set retired using $in
+```js
+const Artist = require("../models/artist");
+
+/**
+ * Sets a group of Artists as retired
+ * @param {array} _ids - An array of the _id's of of artists to update
+ * @return {promise} A promise that resolves after the update
+ */
+module.exports = (_ids) => {
+  return Artist.updateMany({ _id: { $in: _ids } }, { retired: true });
+};
+
+```
+### faker data
+```js
+//seed.js
+import faker from 'faker';
+function createArtist() {
+  return {
+    name: faker.name.findName(),
+    age: randomBetween(15, 45),
+    yearsActive: randomBetween(0, 15),
+    image: faker.image.avatar(),
+    genre: getGenre(),
+    website: faker.internet.url(),
+    netWorth: randomBetween(0, 5000000),
+    labelName: faker.company.companyName(),
+    retired: faker.random.boolean(),
+    albums: getAlbums()
+  };
+}
+```
 ## Section 14: MongoDB with Node and Express
