@@ -251,3 +251,30 @@ https://www.npmjs.com/
   - package.josn与package-lock.json是确保project正确reconstruct的关键
 - Prettier:
   - https://prettier.io/docs/en/options.html
+
+## Section 3: Introduction to Back-End Web Development
+### An Overview of How the Web Works
+- user sent request to server
+  - special request to dns, dns look up for ip
+  - after have an ip address, TCP/IP socket connection is established between the server and client
+  - make a http request
+    - HTTPS is encrypted using TLS or SSL
+- server sent response to client
+  - http response is sent from server
+- then process is repeated for each files
+### Front-End vs. Back-End Web Development
+- Backend:
+  - server: store files, run http server and application
+### Static vs Dynamic vs API
+- Static: 
+  - no backend codes, no application runing
+- Dynamic = Web Application: server-side rendered
+  - database
+  - app: fetch data from db, build website
+- API: 
+  - only send data(in JSON) to browser, not the entire website
+- API Powered website: Client-side rendered
+  - building API
+  - consuming API
+
+## Section 4: How Node.js Works: A Look Behind the Scenes
