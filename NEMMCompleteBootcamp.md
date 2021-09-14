@@ -278,3 +278,126 @@ https://www.npmjs.com/
   - consuming API
 
 ## Section 4: How Node.js Works: A Look Behind the Scenes
+### Node, V8, Libuv and C++
+- V8: writedn in JS&C++ files
+- libuv: event loop, thread pool, writen in C++
+### Processes, Threads and the Thread Pool
+- In a single thread of Nodejs process
+  - Initialize program
+  - Execute “top-level” code
+  - Require moduels
+  - Register evet callbacks
+  - START EVENT LOOP
+- Thread Pool
+  - give four threads(can configure it up to 128 threads) sepearted from the main single thread
+  - Event Loop can offload heavy work to thread pool
+    - heavy work can includes:
+      - File system APIs 
+      - Cryptography
+      - Compression
+      - DNS lookups
+### Event Loop
+- WHERE All the application code that is inside callback functions (non-top-top-level code) executed
+- Don't block
+  -  Don’t use sync versions of functions in fs, crypto and zlib modules in your callback functions 
+  -  Don’t perform complex calculations (e.g. loops inside loops) 
+  -  Be careful with JSON in large objects
+  -  Don’t use too complex regular expressions (e.g. nested quantifiers)
+
+### Streams
+>技巧：``` const server = require("http").createServer();```
+使用Streams，来chunk形式的读取一个文件
+```js
+  const readable = fs.createReadStream("test-file1.txt");
+  readable.on("data", (chunk) => {
+    res.write(chunk);
+  });
+  readable.on("end", () => {
+    res.end();
+  });
+  readable.on("error", (err) => {
+    console.log(err);
+    res.statusCode = 500;
+    res.end("File not found");
+  });
+```
+backpressure: 读取文件的速度要远大于写入的速度
+要完整解决这个问题，可以直接使用pipe，以上的代码，使用下面两行即可完整实现
+```js
+  const readable = fs.createReadStream("test-file.txt");
+  readable.pipe(res);
+```
+### Modules
+在使用require的时候，其实它就已经把需要的文件包裹，并读取，然后放置到缓存里 
+```js
+class Calculator {
+  add(a, b) {
+    return a + b;
+  }
+
+  multiply(a, b) {
+    return a * b;
+  }
+
+  divide(a, b) {
+    return a / b;
+  }
+}
+
+module.exports = Calculator;
+```
+以上还有种更简略的写法，即直接将export assign一个expression
+```js
+module.exports = class  {
+  add(a, b) {
+    return a + b;
+  }
+
+  multiply(a, b) {
+    return a * b;
+  }
+
+  divide(a, b) {
+    return a / b;
+  }
+}
+```
+export的时候也可以将function加到export里,
+```js
+exports.add = (a, b) => a + b;
+exports.multiply = (a, b) => a * b;
+exports.divide = (a, b) => a / b;
+```
+然后调用的时候，即可以使用export的module，直接调用
+```js
+const Cal = require("./test-module2");
+console.log(Cal.add(2, 3));
+```
+或者，更简洁的写法：
+```js
+const {add} = require("./test-module2");
+console.log(add(2, 3));
+```
+对于caching，假如我们定义：
+```js
+//test-module3.js
+console.log("Hello");
+
+module.exports = () => console.log("Log this");
+```
+再导入的时候
+```js
+require("./test-module3")();
+require("./test-module3")();
+require("./test-module3")();
+```
+实际结果，为
+```
+Hello
+Log this
+Log this
+Log this
+```
+因为通过caching，这个module里的code仅仅被load并执行了一次，export里面的东西被存到了node的cache里，每次被call，会从cache里直接调用执行
+## Section 6: Express: Let's Start Building the Natours API!
+### Express
