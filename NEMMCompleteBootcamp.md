@@ -399,5 +399,168 @@ Log this
 Log this
 ```
 因为通过caching，这个module里的code仅仅被load并执行了一次，export里面的东西被存到了node的cache里，每次被call，会从cache里直接调用执行
+
+## Section 5: Asynchronous JavaScript
+npm i superagent
+### 对callback hell的改造,如何建立promise chain
+看下面的代码
+```js
+fs.readFile(`${__dirname}/dog.txt`, (err, data) => {
+  console.log(`Breed: ${data}`);
+  superagent
+    .get(`https://dog.ceo/api/breed/${data}/images/random`)
+    .end((err, res) => {
+      if (err) return console.log(err.message);
+      console.log(res.body);
+
+      fs.writeFile('dog-img.txt', res.body.message, (err) => {
+        console.log('Random write');
+      });
+    });
+});
+```
+如何把他改造成promise chain的形式：需要保证在每一个then里面返回一个promise
+```js
+const readFilePro = (file) => {
+  return new Promise((resolve, reject) => {
+    fs.readFile(file, (err, data) => {
+      if (err) reject('failed to find file');
+      resolve(data);
+    });
+  });
+};
+
+const writeFilePro = (file, data) => {
+  return new Promise((resolve, reject) => {
+    fs.writeFile(file, data, (err) => {
+      if (err) reject('failed to write file');
+      resolve('success');
+    });
+  });
+};
+
+readFilePro(`${__dirname}/dog.txt`)
+  .then((data) => {
+    console.log(`Breed: ${data}`);
+    return superagent.get(`https://dog.ceo/api/breed/${data}/images/random`);
+  })
+  .then((res) => {
+    console.log(res.body);
+    return writeFilePro('dog-img.txt', res.body.message);
+  })
+  .catch((err) => {
+    console.log(err.message);
+  });
+
+```
+### 使用async/await
+简单的将promise转为async/await
+```js
+readFilePro(`${__dirname}/dog.txt`)
+  .then((data) => {
+    console.log(`Breed: ${data}`);
+    return superagent.get(`https://dog.ceo/api/breed/${data}/images/random`);
+  })
+```
+```js
+ const data = await readFilePro(`${__dirname}/dog.txt`);
+ console.log(`Breed: ${data}`);
+ const res = await superagent.get(`https://dog.ceo/api/breed/${data}/images/random`);
+```
+将以上的promise写法，全部改为async/then:
+```js
+readFilePro(`${__dirname}/dog.txt`)
+  .then((data) => {
+    console.log(`Breed: ${data}`);
+    return superagent.get(`https://dog.ceo/api/breed/${data}/images/random`);
+  })
+  .then((res) => {
+    console.log(res.body);
+    return writeFilePro('dog-img.txt', res.body.message);
+  })
+  .catch((err) => {
+    console.log(err.message);
+  });
+```
+```js
+const getDogPic = async () => {
+  try {
+    const data = await readFilePro(`${__dirname}/dog.txt`);
+    console.log(`Breed: ${data}`);
+
+    const res = await superagent.get(
+      `https://dog.ceo/api/breed/${data}/images/random`
+    );
+    console.log(res.body);
+
+    await writeFilePro('dog-img.txt', res.body.message);
+  } catch (err) {
+    console.log(err.message);
+  }
+};
+
+getDogPic();
+
+```
+总结：
+- await必须被async包裹，async标记的不一定包含await
+- await必须加在一个promise前面
+- async/await只是一个语法糖，使代码看起来更同步化，本质还是promise，它并不会将代码改造成sync
+- async可以有return，但是这个return是一个resolve的value，如果想外界捕捉异常，需要在async的内部的try catch里throw一个error
+### 使用IIEF改造promise then
+```js
+console.log('1.Will get dog pics');
+getDogPic()
+  .then((x) => {
+    console.log(x);
+    console.log('3.Done');
+  })
+  .catch((err) => {
+    console.log(err);
+  });
+``` 
+```js
+(async () => {
+  try {
+    console.log('1: Will get dog pics!');
+    const x = await getDogPic();
+    console.log(x);
+    console.log('3: Done getting dog pics!');
+  } catch (err) {
+    console.log('ERROR 💥');
+  }
+})();
+```
+### 并行运行promise
+使用Promise.all
+```js
+const getDogPic = async () => {
+  try {
+    console.log('start');
+    const data = await readFilePro(`${__dirname}/dog.txt`);
+    console.log(`Breed: ${data}`);
+
+    const res1 = superagent.get(
+      `https://dog.ceo/api/breed/${data}/images/random`
+    );
+    const res2 = superagent.get(
+      `https://dog.ceo/api/breed/${data}/images/random`
+    );
+    const res3 = superagent.get(
+      `https://dog.ceo/api/breed/${data}/images/random`
+    );
+
+    const all = await Promise.all([res1, res2, res3]);
+    const imgs = all.map((item) => item.body.message);
+    console.log(imgs);
+
+    await writeFilePro('dog-img.txt', imgs.join('\n'));
+  } catch (err) {
+    console.log(err.message);
+  }
+  return '2:Ready';
+};
+```
+> 技巧：使用.join('\n')来改造输出string形式
 ## Section 6: Express: Let's Start Building the Natours API!
 ### Express
