@@ -1160,3 +1160,55 @@ npm i eslint prettier eslint-config-prettier eslint-plugin-prettier eslint-confi
 https://eslint.org/docs/rules/
 
 npm i eslint@5
+
+## Section 7: Introduction to MongoDB
+###  What is MongoDB?
+Collection - table
+Document - row
+BSON: all values have a data type such as string, number...
+Embeded document
+### Creating a Local Database
+use natours-test
+db.tours.insertOne({ name:"The Forest Hiker", price: 297, rating: 4.7})
+db.tours.find()
+show dbs
+use admin
+use natours-test
+show collections
+quit()
+### CRUD: Creating Documents
+db.tours.insertMany([{name:"The Sea Explorer", price: 497, rating: 4.2},{name:"The Snow Adventurer", price: 997, rating: 4.9,difficulty:"easy"}])
+### CRUD: Querying (Reading) Documents
+db.tours.find()
+db.tours.find({ name:"The Forest Hiker"})
+db.tours.find({difficulty:"easy"})
+db.tours.find({price:{$lte:500}})
+db.tours.find({ price:{$lte:500},rating:{$gte:4.5} })
+db.tours.find({ $or:[{price:{$lte:500}},{rating:{$gte:4.5}}] })
+db.tours.find({ $or:[{price:{$gt:500}},{rating:{$gte:4.5}}] })
+db.tours.find({ $or:[{price:{$gt:500}},{rating:{$gte:4.5}}] },{name: 1})
+
+### CRUD: Updating Documents
+- 使用updateOne，只有返回的第一个结果会被update
+db.tours.updateOne({name:"The Snow Adventurer"},{$set: {price:597}})
+db.tours.find({price:{$gt:400}, rating:{$gte:4.7}})
+db.tours.updateMany({price:{$gt:400}, rating:{$gte:4.7}},{$set:{premium:true}})
+db.tours.replaceOne()
+
+### CRUD: Deleting Documents
+db.tours.find()
+db.tours.deleteMany({rating:{$lt: 4.7}})
+db.tours.deleteMany({})
+
+### Using Compass App for CRUD Operations
+Search里Filter填的与shell里的filter一致，比如：
+{price:{$gt:400}, rating:{$gte:4.7}}
+Filter下拉里填的project是希望输出的column
+
+### Creating a Hosted Database with Atlas
+### Connecting to Our Hosted Database
+mongosh "mongodb+srv://cluster0.hcj6w.mongodb.net/myFirstDatabase" --username Chris
+mongo "mongodb+srv://cluster0.hcj6w.mongodb.net/myFirstDatabase" --username Chris
+
+Security:
+- Network Access: Add IP Address -> Allow Access From Anywhere
