@@ -564,3 +564,599 @@ const getDogPic = async () => {
 > 技巧：使用.join('\n')来改造输出string形式
 ## Section 6: Express: Let's Start Building the Natours API!
 ### Express
+使用send发送一个返回
+```js
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => {
+  res.status(200).send('Hello from the server');
+});
+
+app.listen('3050', () => {
+  console.log('App runing');
+});
+```
+使用json发送一个返回
+```js
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'Hello from the server', app: 'Natours' });
+});
+```
+### APIs and RESTful API Design
+- API endpoint不能含有动词，因为动词部分已经被get,post等方法表示
+- endpoint应该对应数据库里面的resources,例如
+  - /addNewTour -> POST /tours
+  - /getTour -> GET /tours/7
+  - /updateTour -> PUT /tours/7 OR PATCH /tours/7
+  - /deleteTour -> DELETE /tours/7
+  - /getToursByUser -> GET /users/3/tours
+  - /deleteToursByUser -> DELETE /users/3/tours/9
+- JSON VS Javascript Object
+  - 同样都是key-value pair
+  - JSON的key必须是string，value可以是string，number，boolean等等
+  - 我们在send一个response的时候可以使用JSend做formatting
+- Stateless RESTful API
+  - All state is handled on the client. This means that each 
+request must contain all the information necessary to process a certain request. The server should not have to remember previous requests
+
+### API get
+```js
+const express = require('express');
+const app = express();
+const fs = require('fs');
+
+app.use(exress.json());
+const tours = JSON.parse(
+  fs.readFileSync(`${__dirname}/dev-data/data/tours-simple.json`)
+);
+
+app.get('/api/tours', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    results: tours.length,
+    data: {
+      tours,
+    },
+  });
+});
+
+app.post('/api/tours',(req,res) => {
+
+})
+
+app.listen('3050', () => {
+  console.log('App runing');
+});
+
+```
+### API post
+- middleware 是在req与res之间处理他们交互的
+- 加入下面这行，可以获取request里的body内容
+```js
+app.use(exress.json());
+```
+```js
+app.post('/api/tours', (req, res) => {
+  console.log(req.body);
+  const newId = tours[tours.length - 1].id + 1;
+  const newTour = Object.assign({ id: newId }, req.body);
+
+  tours.push(newTour);
+  fs.writeFile(
+    `${__dirname}/dev-data/data/tours-simple.json`,
+    JSON.stringify(tours),
+    (err) => {
+      res.status(201).json({
+        status: 'success',
+        data: {
+          tour: newTour,
+        },
+      });
+    }
+  );
+});
+```
+### Responding to URL Parameters
+- 使用req.params拿到parameters
+- 在url后面加入？,就可使这个url变为optional，这样即使前端输入的参数不全时，也能通过,例如下面，就算输入/api/tours/6/5 也不会报错
+> 技巧：将一个数字string转化为num的方法，就是直接在后面*1，因为从req回来的是json，因此需要这样的string到num转换，比如下面这样
+> ```const tour = tours.find((el) => el.id === req.params.id * 1);```
+```js
+app.get('/api/tours/:id/:x/:y?', (req, res) => {})
+```
+注意，req里拿到json数据格式都是string，也需要注意，我们sendback的都是json数据
+```js
+app.get('/api/tours/:id', (req, res) => {
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(200).json({
+    status: 'success',
+    data: {
+      tour,
+    },
+  });
+});
+```
+### API PATCH
+PATCH VS PUT
+- PATCH：仅更新需要更新的属性
+- PUT:更新整个object
+```js
+app.patch('/api/tours/:id', (req, res) => {
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(200).json({
+    status: 'success',
+    data: { tour: '<Updated tour>' },
+  });
+});
+```
+### API DELETE
+- delete返回的data一般是null
+```js
+app.delete('/api/tours/:id', (req, res) => {
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(204).json({
+    status: 'success',
+    data: null,
+  });
+});
+```
+### Refactor Router
+1. 抽出每个callback
+注意，调用callback的时候没有（）
+```js
+const getAllTours = (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    results: tours.length,
+    data: {
+      tours,
+    },
+  });
+};
+
+const getTourById = (req, res) => {
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(200).json({
+    status: 'success',
+    data: {
+      tour,
+    },
+  });
+};
+
+const createTour = (req, res) => {
+  console.log(req.body);
+  const newId = tours[tours.length - 1].id + 1;
+  const newTour = Object.assign({ id: newId }, req.body);
+
+  tours.push(newTour);
+  fs.writeFile(
+    `${__dirname}/dev-data/data/tours-simple.json`,
+    JSON.stringify(tours),
+    (err) => {
+      res.status(201).json({
+        status: 'success',
+        data: {
+          tour: newTour,
+        },
+      });
+    }
+  );
+};
+
+const updateTour = (req, res) => {
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(200).json({
+    status: 'success',
+    data: { tour: '<Updated tour>' },
+  });
+};
+
+const deleteTour = (req, res) => {
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(204).json({
+    status: 'success',
+    data: null,
+  });
+};
+
+app.get('/api/tours', getAllTours);
+app.get('/api/tours/:id', getTourById);
+app.post('/api/tours', createTour);
+app.patch('/api/tours/:id', updateTour);
+app.delete('/api/tours/:id', deleteTour);
+```
+2.使用route改善
+```js
+app.get('/api/tours', getAllTours);
+app.get('/api/tours/:id', getTourById);
+app.post('/api/tours', createTour);
+app.patch('/api/tours/:id', updateTour);
+app.delete('/api/tours/:id', deleteTour);
+```
+可以改为
+```js
+app.route('/api/tours').get(getAllTours).post(createTour);
+app.route('/api/tours/:id').get(getTourById).patch(updateTour).delete(deleteTour);
+```
+### Middleware and Request-Response Cycle
+Everything is middleware(even routers)
+- parsing body
+- logging
+- setting header
+- router
+Request-Response Cycle
+- starting from 'incoming request'
+- then execrting all the middleware in middleware stack step by step
+- finally sending the response to finish the cycle
+
+### Creating Our Own Middleware
+1. 使用user来引用middleware，use里的三个参数跟着request, response和next
+2. middleware必须使用next()结束，不然会使程序stuck Request-Response Cycle 中
+3. middleware一定是按照顺序执行的
+```js
+app.use((req, res, next) => {
+  req.requestTime = new Date().toLocaleTimeString();
+  next();
+});
+```
+### Using 3rd-Party Middleware
+morgan: see request data in console
+npm i morgan
+app.use(morgan('dev'));
+https://expressjs.com/en/5x/api.html
+https://expressjs.com/en/resources/middleware.html
+
+### Implementing the "Users" Routes
+1. add routers for user
+```js
+app.route('/api/users').get(getAllUsers).post(createUser);
+app.route('/api/users/:id').get(getUser).patch(updateUser).delete(deleteUser);
+```
+2. add handlerfunctions
+
+### Creating and Mounting Multiple Routers
+1. Add middleware
+2. use express to connect mini router to middleware
+```js
+const tourRouter = express.Router();
+tourRouter.route('/').get(getAllTours).post(createTour);
+tourRouter
+  .route('/:id')
+  .get(getTourById)
+  .patch(updateTour)
+  .delete(deleteTour);
+
+app.use('/api/tours',tourRouter);
+```
+其中``` app.use('/api/users',userRouter);```叫做mounting a new Router
+
+### A Better File Structure
+1. 建立routes文件夹，与tourRoutes.js, userRoutes.js两个新文件
+2. 在tourRoutes.js, userRoutes.js两个文件中，提取出相应get等方法
+3. 建立controllers文件夹，与tourController.js， userController.js两个文件，注意这里fs引用的文件地址写法
+4. 在两个文件中，写入对应的handler方法，并回到tourRoutes.js, userRoutes.js中做引用
+5. 在app.js中导入两个module
+6. 创建server.js，将server相关的移入其中,其它可以迁入的还有database configuraion, error handling or enviroment variables
+> 技巧：app.js主要做middleware declarations,configure everything with express application
+```js
+// tourRoutes.js
+const express = require('express');
+const {
+  getAllTours,
+  createTour,
+  getTourById,
+  updateTour,
+  deleteTour,
+} = require('../controllers/tourController');
+
+const router = express.Router();
+router.route('/').get(getAllTours).post(createTour);
+router.route('/:id').get(getTourById).patch(updateTour).delete(deleteTour);
+
+module.exports = router;
+
+```
+```js
+//userRoutes.js
+const express = require('express');
+const {
+  getAllUsers,
+  createUser,
+  getUser,
+  updateUser,
+  deleteUser,
+} = require('../controllers/userController');
+
+const router = express.Router();
+router.route('/').get(getAllUsers).post(createUser);
+router.route('/:id').get(getUser).patch(updateUser).delete(deleteUser);
+
+module.exports = router;
+```
+```js
+//tourController.js
+const fs = require('fs');
+
+const tours = JSON.parse(
+  fs.readFileSync(`${__dirname}/../dev-data/data/tours-simple.json`)
+);
+
+exports.getAllTours = (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    results: tours.length,
+    data: {
+      tours,
+    },
+  });
+};
+
+exports.getTourById = (req, res) => {
+  console.log(req.requestTime);
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(200).json({
+    status: 'success',
+    data: {
+      tour,
+    },
+  });
+};
+
+exports.createTour = (req, res) => {
+  console.log(req.body);
+  const newId = tours[tours.length - 1].id + 1;
+  const newTour = Object.assign({ id: newId }, req.body);
+
+  tours.push(newTour);
+  fs.writeFile(
+    `${__dirname}/dev-data/data/tours-simple.json`,
+    JSON.stringify(tours),
+    (err) => {
+      res.status(201).json({
+        status: 'success',
+        data: {
+          tour: newTour,
+        },
+      });
+    }
+  );
+};
+
+exports.updateTour = (req, res) => {
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(200).json({
+    status: 'success',
+    data: { tour: '<Updated tour>' },
+  });
+};
+
+exports.deleteTour = (req, res) => {
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(204).json({
+    status: 'success',
+    data: null,
+  });
+};
+
+```
+```js
+//userController.js
+const fs = require('fs');
+
+const users = JSON.parse(
+  fs.readFileSync(`${__dirname}/../dev-data/data/users.json`)
+);
+
+exports.getAllUsers = (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    results: users.length,
+    data: {
+      users,
+    },
+  });
+};
+
+exports.getUser = (req, res) => {
+  console.log(req.requestTime);
+  const user = users.find((el) => el.id === req.params.id * 1);
+  if (!user) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user,
+    },
+  });
+};
+
+exports.createUser = (req, res) => {
+  console.log(req.body);
+  const newId = users[users.length - 1].id + 1;
+  const newUser = Object.assign({ id: newId }, req.body);
+
+  users.push(newUser);
+  fs.writeFile(
+    `${__dirname}/dev-data/data/users.json`,
+    JSON.stringify(users),
+    (err) => {
+      res.status(201).json({
+        status: 'success',
+        data: {
+          user: newUser,
+        },
+      });
+    }
+  );
+};
+
+exports.updateUser = (req, res) => {
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(200).json({
+    status: 'success',
+    data: { tour: '<Updated tour>' },
+  });
+};
+
+exports.deleteUser = (req, res) => {
+  const tour = tours.find((el) => el.id === req.params.id * 1);
+  if (!tour) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+  res.status(204).json({
+    status: 'success',
+    data: null,
+  });
+};
+
+```
+```js
+//server.js
+const app = require('./app');
+
+app.listen('3050', () => {
+  console.log('App runing');
+});
+```
+### Param Middleware
+- 1. 通过提取每个handler的验证部分，在controller中建立新的middleware handler function，其中通过参数val拿取path里的parameter
+- 2. 注意这个checkID function中的return必不能少，因为如果没有return，express会继续执行这个function
+- 3. 最后在router中导入并使用，注意调用的时候是router.param()
+- 这种将共用功能抽取单独做成middleware function的做法是最符合express思想的, the handler should only concerns what it really needs to do 
+```js
+//tourController.js
+exports.checkID = (req, res, next, val) => {
+  if (val > tours.length) {
+    return res.status(404).json({
+      status: 'fail',
+      message: `Couldn't find tour`,
+    });
+  }
+
+  next();
+};
+```
+```js
+//tourRoutes.js
+router.param('id', checkID);
+```
+### Chaining Multiple Middleware Functions
+- 1. 在middleware function中想建立新的function，比如创建record前，我想验证body是否合法
+- 2. 首先写好middleware function
+- 3. 然后在router里引用，写法为```router.route('/').get(getAllTours).post(checkBody, createTour); ```
+```js
+//tourController.js
+exports.checkBody = (req, res, next) => {
+  if (!req.body.name || !req.body.price) {
+    return res.status(400).json({
+      status: 'fail',
+      message: `Require name and price`,
+    });
+  }
+
+  next();
+};
+```
+```js
+//tourRoutes.js
+router.route('/').get(getAllTours).post(checkBody, createTour);
+```
+
+### Serving Static Files
+通过middleware来增加对static file的访问，注意
+- static后面的path跟的是文件目录，不能是具体文件
+- 在前端访问的时候，地址栏输入的是具体文件名，而不能够是目录，比如下面是合法的访问：http://localhost:3050/overview.html
+```js
+app.use(express.static(`${__dirname}/public`));
+```
+
+### Environment Variables
+npm i dotenv
+1. 安装 dotenv，创建配置文件config.env
+2. 在server.js中导入
+```js
+const dotenv = require('dotenv');
+dotenv.config({ path: './config.env' });
+```
+3. 在其它文件中即可使用
+```js
+if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
+```
+- 读取config.env的过程只会发生一次，因此并不需要反复定义
+- 读取环境变量，只需要使用process.env.即可
+- 导入与dotenv.config都必须放在 app.js导入之前，不然无法在其中调用
+
+### ESlint
+npm i eslint prettier eslint-config-prettier eslint-plugin-prettier eslint-config-airbnb eslint-plugin-node eslint-plugin-import eslint-plugin-jsx-a11y eslint-plugin-react --save-dev
+https://eslint.org/docs/rules/
+
+npm i eslint@5
