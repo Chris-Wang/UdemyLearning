@@ -456,3 +456,151 @@ interfaces + classes = How we get really strong code resue in TS
 
 ## Section 9: Design Patterns with Typescript
 npm i -g parcel-bundler
+parcel index.html
+npmjs.com
+
+Could not find a declaration file for module 'faker':
+Type definition file: an adaptor between typescript code and JavaScript library
+@types/faker
+npm i @types/faker
+
+按住ctrl点击faker，能看到index.d.ts: type definiation file
+> 想inspect一个变量，只要按住ctrl再点击就好
+class中的object在使用前，必须要先初始化，例如
+```ts
+import faker from 'faker';
+
+export class User {
+  name: string;
+  location:{
+    lat:number;
+    lng:number;
+  };
+
+  constructor(){
+    this.name = faker.name.firstName();
+    this.location = {
+      lat: parseFloat(faker.address.latitude()),
+      lng: parseFloat(faker.address.longitude())
+    }
+
+  }
+}
+```
+> 在文件中export的，都可以在另外一个文件中通过import {}实现调用
+
+### export default
+如果一个文件中 export 跟了default例如
+```ts
+//User.ts
+export default 'red';
+```
+那在另外一个文件import的，就是这个值
+```ts
+import color from './User';
+console.log(color); // 'red'
+```
+在ts中强烈不建议用 export default
+
+npm install @types/google.maps
+/// <reference types="@types/google.maps" />
+
+> Ctrl+P: 输入>fold level 2
+
+### 使用interface来改写addMarker
+原本的addMarker方法中，使用了基本相似的结构和代码
+```ts
+  addUserMarker(user: User): void {
+    new google.maps.Marker({
+      map: this.googleMap,
+      position: {
+        lat: user.location.lat,
+        lng: user.location.lng,
+      },
+    });
+  }
+
+  addCompanyMarker(company: Company): void {
+    new google.maps.Marker({
+      map: this.googleMap,
+      position: {
+        lat: company.location.lat,
+        lng: company.location.lng,
+      },
+    });
+  }
+```
+使用mappable, 只ref共同的attribute
+```ts
+  addMarker(mappable: User | Company): void {
+    new google.maps.Marker({
+      map: this.googleMap,
+      position: {
+        lat: mappable.location.lat,
+        lng: mappable.location.lng,
+      },
+    });
+  }
+```
+使用interface
+```ts
+interface Item {
+  location: {
+    lat: number;
+    lng: number;
+  };
+}
+
+addMarker(item: Item): void {
+    new google.maps.Marker({
+      map: this.googleMap,
+      position: {
+        lat: item.location.lat,
+        lng: item.location.lng,
+      },
+    });
+  }
+```
+### Optional implement of Interface
+implement an interface: tell ts to satisfy the interface
+```ts
+//Map.js
+export interface Item {
+  location: {
+    lat: number;
+    lng: number;
+  };
+
+  markerContent(): string;
+  color: string;
+}
+```
+```ts
+//User.ts
+import faker from 'faker';
+import { Item } from './Map';
+
+export class User implements Item {
+  name: string;
+  location: {
+    lat: number;
+    lng: number;
+  };
+  color: string = 'red';
+  constructor() {
+    this.name = faker.name.firstName();
+    this.location = {
+      lat: parseFloat(faker.address.latitude()),
+      lng: parseFloat(faker.address.longitude()),
+    };
+  }
+
+  markerContent(): string {
+    return `User: ${this.name}`;
+  }
+}
+```
+instructions on how to be an argument to its methods
+Typical Typescript File
+- Interface definition for working with this class
+- Class definition 
