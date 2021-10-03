@@ -604,3 +604,175 @@ instructions on how to be an argument to its methods
 Typical Typescript File
 - Interface definition for working with this class
 - Class definition 
+
+## Section 10: More on Design Patterns
+tsc --init
+### config tsconfig
+in tsconfig.json
+```json
+  "outDir": "./build", 
+  "rootDir": "./src", 
+```
+tsc -w
+
+### add nodemon and concurrently, to build and run automatically
+npm init -y
+npm i nodemon concurrently
+in package.json
+```json
+  "scripts": {
+    "start:build": "tsc -w",
+    "start:run": "nodemon build/index.js",
+    "start":"concurrently npm:start:*"
+  },
+```
+String is immutable: 你无法通过str[1]='y'这样来改变str的内容
+
+### sort a string
+Union Types: only access properties in both 
+```ts
+export class CharactersCollection {
+  constructor(public data: string) {}
+
+  get length(): number {
+    return this.data.length;
+  }
+
+  compare(leftIndex: number, rightIndex: number): boolean {
+    return (
+      this.data[leftIndex].toLowerCase() > this.data[rightIndex].toLowerCase()
+    );
+  }
+
+  swap(leftIndex: number, rightIndex: number): void {
+    const characters = this.data.split('');
+    const lefthand = characters[leftIndex];
+    characters[leftIndex] = characters[rightIndex];
+    characters[rightIndex] = lefthand;
+
+    this.data = characters.join('');
+  }
+}
+```
+#### type guard
+using to access a union type
+typeof:
+- narrow type of a value to a primitive type: number, string, boolean, symbol
+instanceof:
+- narraow down every other type of value: every other value that is created with a contructor function
+```ts
+class Sorter {
+  constructor(public collection: number[] | string) {}
+
+  sort(): void {
+    const { length } = this.collection;
+
+    for (let i = 0; i < length; i++) {
+      for (let j = 0; j < length - i - 1; j++) {
+        if (this.collection instanceof Array) {
+          if (this.collection[j] > this.collection[j + 1]) {
+            const lefthand = this.collection[j];
+            this.collection[j] = this.collection[j + 1];
+            this.collection[j + 1] = lefthand;
+          }
+        }
+        if (typeof this.collection === 'string') {
+          if (this.collection[j] > this.collection[j + 1]) {
+            //TODO: SORT STRING
+          }
+        }
+      }
+    }
+  }
+}
+```
+#### 三元表达式简写
+```ts
+compare(leftIndex: number, rightIndex: number): boolean {
+    return this.data[leftIndex] > this.data[rightIndex] ? true : false;
+  }
+```
+简写为
+```ts
+compare(leftIndex: number, rightIndex: number): boolean {
+    return this.data[leftIndex] > this.data[rightIndex];
+  }
+```
+#### class 中的getter方法
+```ts
+export class NumberCollection {
+  constructor(public data: number[]) {}
+  get length(): number {
+    return this.data.length;
+  }
+}
+```
+这样想access data的length，可以直接
+```ts
+const num = new NumberCollection([2,3,1]);
+num.length;
+```
+### 将sorter作为方法加入到collection里
+#### Abstract Class
+- can't be used to create an object directly
+- only be used as a parent class
+- can contain real implementation for some methods
+- the implementated methos can refer to other methods that don't actually exist yet
+- can make child classes promise to implement other methods
+
+把原本的Class改为Abstract Class，然后让NumberCollection等继承
+```ts
+interface Sortable {
+  length: number;
+  swap(leftIndex: number, rightIndex: number): void;
+  compare(leftIndex: number, rightIndex: number): boolean;
+}
+
+export class Sorter {
+  constructor(public collection: Sortable) {}
+
+  sort(): void {
+    const { length } = this.collection;
+
+    for (let i = 0; i < length; i++) {
+      for (let j = 0; j < length - i - 1; j++) {
+        if (this.collection.compare(j, j + 1)) {
+          this.collection.swap(j, j + 1);
+        }
+      }
+    }
+  }
+}
+```
+变为
+```ts
+export abstract class Sorter {
+  
+  abstract length: number;
+  abstract swap(leftIndex: number, rightIndex: number): void;
+  abstract compare(leftIndex: number, rightIndex: number): boolean;
+  
+  sort(): void {
+    const { length } = this;
+
+    for (let i = 0; i < length; i++) {
+      for (let j = 0; j < length - i - 1; j++) {
+        if (this.compare(j, j + 1)) {
+          this.swap(j, j + 1);
+        }
+      }
+    }
+  }
+}
+```
+
+### Interface VS Abstract Classes
+In common
+- sets up a contract between different classes
+Differences:
+Interfaces:
+- use when we have very different objects that we have to work together
+- promotes loose coupling
+Abstract Classes:
+- use when we are trying to build up a definition of an object
+- strongly couples classes together
