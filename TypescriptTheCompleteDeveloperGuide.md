@@ -771,8 +771,632 @@ In common
 - sets up a contract between different classes
 Differences:
 Interfaces:
-- use when we have very different objects that we have to work together
+- use when we have very different objects that we have to work together`
 - promotes loose coupling
 Abstract Classes:
 - use when we are trying to build up a definition of an object
 - strongly couples classes together
+
+## Section 11: Reusable Code
+npm init -y
+tsc --init
+npm i nodemon concurrently
+
+fs.readFileSync(path,[,options])
+### Type Definitions files
+incorrectly error report by ts, may cause by not installing type definition files
+npm i @types/node
+### Read and Parse file items
+```ts
+const matches = fs
+  .readFileSync('football.csv', {
+    encoding: 'utf-8',
+  })
+  .split('\n')
+  .map((row: string): string[] => {
+    return row.split(',');
+  });
+```
+### Basic process in JS
+```ts
+import fs from 'fs';
+
+const matches = fs
+  .readFileSync('football.csv', {
+    encoding: 'utf-8',
+  })
+  .split('\n')
+  .map((row: string): string[] => {
+    return row.split(',');
+  });
+
+console.log(matches);
+
+let manUnitedWins = 0;
+for (let match of matches) {
+  if (match[1] === 'Man United' && match[5] === 'H') {
+    manUnitedWins++;
+  }
+  if (match[2] === 'Man United' && match[5] === 'A') {
+    manUnitedWins++;
+  }
+}
+
+console.log(`Man United won ${manUnitedWins} games`);
+```
+### Refactor the code
+#### Remove magic string using Enum
+before
+```ts
+const homeWin = 'H';
+const awayWin = 'A';
+const draw = 'D';
+
+
+let manUnitedWins = 0;
+for (let match of matches) {
+  if (match[1] === 'Man United' && match[5] === homeWin) {
+    manUnitedWins++;
+  }
+  if (match[2] === 'Man United' && match[5] === awayWin) {
+    manUnitedWins++;
+  }
+}
+
+console.log(`Man United won ${manUnitedWins} games`);
+```
+#### Enum VS Objects
+```ts
+// enum- enumeration
+enum MatchResult {
+  HomeWin = 'H',
+  AwayWin = 'A',
+  Draw = 'D',
+}
+```
+```ts
+// object
+const MatchResult =  {
+  HomeWin:'H',
+  AwayWin:'A',
+  Draw:'D',
+}
+```
+The purpose of the enum is to signal to other engineers that this is a collection of very closely related values, and we create a Type
+```ts
+const pringResult = ():MatchResult =>{
+  if(match[5] == 'H'){
+    return MatchResult.HomeWin;
+  }
+  return MatchResult.AwayWin;
+}
+```
+#### Enum
+适用于比较小的，fixed的，key-value pair
+- Follow near-identical syntax rules as normal objects
+- Creates an object with the same keys and values when converted from TS to JS
+- Primary goal is to signal to other engineers that these are all closely related values
+- Use whenever we have a small fixed set of values that are all closely related and known at compile time
+
+### Extract File Read
+为什么？因为我们以后可能将读取文件这步通过api来取代，那在这步写的逻辑就会被删掉；
+因此将之抽取出来，不仅可以复用，而且还能保留。
+before
+```ts
+import fs from 'fs';
+
+const matches = fs
+  .readFileSync('football.csv', {
+    encoding: 'utf-8',
+  })
+  .split('\n')
+  .map((row: string): string[] => {
+    return row.split(',');
+  });
+
+console.log(matches);
+```
+after
+```ts
+//CsvFileReader.ts
+import fs from 'fs';
+
+export class CsvFileReader {
+  data: string[][] = [];
+
+  constructor(public filename: string) {}
+
+  read(): void {
+    this.data = fs
+      .readFileSync(this.filename, {
+        encoding: 'utf-8',
+      })
+      .split('\n')
+      .map((row: string): string[] => {
+        return row.split(',');
+      });
+  }
+}
+```
+```ts
+//index.ts
+import { CsvFileReader } from './CsvFileReader';
+
+const fileReader = new CsvFileReader('football.csv');
+fileReader.read();
+console.log(fileReader.data);
+```
+### Refactor enum and Type assertion
+使用as，来将property 转变成任一Type
+```ts
+//MatchResult.ts
+export enum MatchResult {
+  HomeWin = 'H',
+  AwayWin = 'A',
+  Draw = 'D',
+}
+
+```
+```ts
+//CsvFileReader.ts
+import { MatchResult } from './MatchResult';
+export class CsvFileReader {
+  data: string[][] = [];
+  read(): void {
+    this.data = fs
+    ...
+    .map((row: string[]): any => {
+        return [
+          dateStringToDate(row[0]),
+          row[1],
+          row[2],
+          parseInt(row[3]),
+          parseInt(row[4]),
+          row[5] as MatchResult, // 'H','D','A'
+          row[6],
+        ];
+      });
+  }
+}
+
+```
+### Refactor the data array, parse string to different types using tuple
+1. Define the tuple as a new type
+```ts
+type MatchData = [Date, string, string, number, number, MatchResult, string];
+```
+2. Convert the row of string into the appropriate types
+```ts
+export class CsvFileReader {
+  data: MatchData[] = [];
+
+  constructor(public filename: string) {}
+
+  read(): void {
+    this.data = fs
+      .readFileSync(this.filename, {
+        encoding: 'utf-8',
+      })
+      .split('\n')
+      .map((row: string): string[] => {
+        return row.split(',');
+      })
+      .map((row: string[]): MatchData => {
+        return [
+          dateStringToDate(row[0]),
+          row[1],
+          row[2],
+          parseInt(row[3]),
+          parseInt(row[4]),
+          row[5] as MatchResult,
+          row[6],
+        ];
+      });
+  }
+}
+```
+### Refactor CsvFileReader
+1. 改写helper function:注意这种写法
+```ts
+ read(): void {
+    this.data = fs
+      .readFileSync(this.filename, {
+        encoding: 'utf-8',
+      })
+      .split('\n')
+      .map((row: string): string[] => {
+        return row.split(',');
+      })
+      .map((row: string[]): MatchData => {
+        return [
+          dateStringToDate(row[0]),
+          row[1],
+          row[2],
+          parseInt(row[3]),
+          parseInt(row[4]),
+          row[5] as MatchResult,
+          row[6],
+        ];
+      });
+  }
+```
+改为
+```ts
+ read(): void {
+    this.data = fs
+      .readFileSync(this.filename, {
+        encoding: 'utf-8',
+      })
+      .split('\n')
+      .map((row: string): string[] => {
+        return row.split(',');
+      })
+      .map(this.mapRow);
+  }
+
+  mapRow(row: string[]):MatchData{
+    return [
+      dateStringToDate(row[0]),
+      row[1],
+      row[2],
+      parseInt(row[3]),
+      parseInt(row[4]),
+      row[5] as MatchResult,
+      row[6],
+    ];
+  }
+```
+2. 抽取可以复用的部分，改写为abstract class
+我们希望CsvFileReader可以用来读取所有的csv文件，而不再是football.csv，所以，我们把其中对于football.csv的parse部分，单独提了出来，可以复用的部分，留在了CsvFileReader
+```ts
+//CsvFileReader.ts
+import fs from 'fs';
+import { MatchResult } from './MatchResult';
+
+type MatchData = [Date, string, string, number, number, MatchResult, string];
+
+export abstract class CsvFileReader {
+  data: MatchData[] = [];
+
+  constructor(public filename: string) {}
+
+  abstract mapRow(row: string[]):MatchData;
+
+  read(): void {
+    this.data = fs
+      .readFileSync(this.filename, {
+        encoding: 'utf-8',
+      })
+      .split('\n')
+      .map((row: string): string[] => {
+        return row.split(',');
+      })
+      .map(this.mapRow);
+  }
+}
+```
+```ts
+//MatchReader.ts
+import { CsvFileReader } from "./CsvFileReader";
+import {dateStringToDate} from "./utils";
+import {MatchData} from "./CsvFileReader";
+import { MatchResult } from './MatchResult';
+
+export class MatchReader implements CsvFileReader {
+  mapRow(row: string[]):MatchData{
+    return [
+      dateStringToDate(row[0]),
+      row[1],
+      row[2],
+      parseInt(row[3]),
+      parseInt(row[4]),
+      row[5] as MatchResult,
+      row[6],
+    ];
+  }
+}
+```
+#### Generics
+- Like function arguments, but for types in class/function definition
+- Allow us to define the type of a property/argument/return value at a future point
+- Used heavily when writing reusable code
+首先来看类似的function argument:
+```ts
+const addOne = (a:number):number =>{
+  return a + 1;
+}
+const addTwo = (a:number):number =>{
+  return a + 2;
+}
+const addThree = (a:number):number =>{
+  return a + 3;
+}
+```
+
+```ts
+const add = (a:number, b:number):number =>{
+  return a + b;
+}
+```
+类似的，对于class我们也可以传入这样的argument
+```ts
+class HoldNumber {
+  data:number;
+}
+
+class HoldString {
+  data: string;
+}
+const holdNumber = new HoldNumber();
+holdNumber.data = 123;
+
+const holdString = new HoldString();
+holdString = 'asd';
+```
+```ts
+class HoldAnything<TypeOfData>{
+  data: TypeOfData;
+  add(a:TypeOfData):TypeOfData{
+    return a;
+  }
+}
+
+const holdNumber = new HoldAnything<number>();
+holdNumber.data = 123;
+const holdString = new HoldAnything<string>();
+holdString = 'asd';
+```
+3. 讲abstract class中，属于match的部分提取出来，用generic取代
+```ts
+import fs from 'fs';
+
+export abstract class CsvFileReader<T> {
+  data: T[] = [];
+
+  constructor(public filename: string) {}
+
+  abstract mapRow(row: string[]): T;
+
+  read(): void {
+    this.data = fs
+      .readFileSync(this.filename, {
+        encoding: 'utf-8',
+      })
+      .split('\n')
+      .map((row: string): string[] => {
+        return row.split(',');
+      })
+      .map(this.mapRow);
+  }
+}
+export abstract class CsvFileReader<T> {
+  data: T[] = [];
+  constructor(public filename: string) {}
+  abstract mapRow(row: string[]): T;
+}
+```
+```ts
+import { CsvFileReader } from './CsvFileReader';
+import { dateStringToDate } from './utils';
+import { MatchResult } from './MatchResult';
+
+type MatchData = [Date, string, string, number, number, MatchResult, string];
+
+export class MatchReader extends CsvFileReader<MatchData> {
+  mapRow(row: string[]): MatchData {
+    return [
+      dateStringToDate(row[0]),
+      row[1],
+      row[2],
+      parseInt(row[3]),
+      parseInt(row[4]),
+      row[5] as MatchResult,
+      row[6],
+    ];
+  }
+}
+```
+### Refactor的另一种思路
+这次我们使用interface来refactor，我们希望matchreader里包含的reader，可以是dataReader这个interface下面的，例如csvFileReader
+1. 添加interface，增加MatchReader class
+```ts
+import { dateStringToDate } from './utils';
+import { MatchResult } from './MatchResult';
+
+type MatchData = [Date, string, string, number, number, MatchResult, string];
+
+interface DataReader {
+  read(): void;
+  data: string[][];
+}
+
+export class MatchReader {
+  matches: MatchData[] = [];
+  constructor(public reader: DataReader) {}
+  load(): void {}
+}
+```
+2. 改写CsvFileReader class
+```ts
+import fs from 'fs';
+
+export class CsvFileReader {
+  data: string[][] = [];
+
+  constructor(public filename: string) {}
+
+  read(): void {
+    this.data = fs
+      .readFileSync(this.filename, {
+        encoding: 'utf-8',
+      })
+      .split('\n')
+      .map((row: string): string[] => {
+        return row.split(',');
+      });
+  }
+}
+
+```
+3. 补完MatchReader
+```ts
+import { dateStringToDate } from './utils';
+import { MatchResult } from './MatchResult';
+
+type MatchData = [Date, string, string, number, number, MatchResult, string];
+
+interface DataReader {
+  read(): void;
+  data: string[][];
+}
+
+export class MatchReader {
+  matches: MatchData[] = [];
+  constructor(public reader: DataReader) {}
+  load(): void {
+    this.reader.read();
+    this.matches = this.reader.data.map((row: string[]): MatchData => {
+      return [
+        dateStringToDate(row[0]),
+        row[1],
+        row[2],
+        parseInt(row[3]),
+        parseInt(row[4]),
+        row[5] as MatchResult,
+        row[6],
+      ];
+    });
+  }
+}
+
+```
+4. 在index.ts中调用
+```ts
+import { MatchReader } from './MatchReader';
+import { MatchResult } from './MatchResult';
+import { CsvFileReader } from './CsvFileReader';
+
+const csvFileReader = new CsvFileReader('football.csv');
+const fileReader = new MatchReader(csvFileReader);
+fileReader.load();
+
+let manUnitedWins = 0;
+for (let match of fileReader.matches) {
+  if (match[1] === 'Man United' && match[5] === MatchResult.HomeWin) {
+    manUnitedWins++;
+  }
+  if (match[2] === 'Man United' && match[5] === MatchResult.AwayWin) {
+    manUnitedWins++;
+  }
+}
+
+console.log(`Man United won ${manUnitedWins} games`);
+```
+### Inheritance VS Composition
+Inheritance:
+abstract class: CSVFileReader
+- class MatchReader
+- class MovieReader
+> Characterized by an 'is a' relationship between two classes
+
+Composition:
+MatchReader
+- reader: interface DataReader
+  - class CSVFileReader
+  - class ApiReader
+> Characterized by an 'has a' relationship between two classes
+
+#### Inheritance
+class Window
+- open: boolean
+- height: number
+- width: number
+- area():number
+- toggleOpen():void
+
+class Wall
+- color: string
+- height: number
+- width: number
+- area():number
+
+then we can have an abstract class for these two
+class Rectangle
+- height: number
+- width: number
+- area():number
+
+if we have circle window
+class Circle
+- radius: number
+- area():number
+
+class CircleWindow
+- radius: number
+- area():number
+- toggleOpen():void
+
+> 将可以复用的代码抽取出来，放置在abstract class中，再继承调用，并扩展
+#### Composition
+Window and CircleWindow have some same properties
+class Wall
+- color: string
+- dimensions: Shape
+- area():number
+
+class Window
+- open: boolean
+- dimensions: Shape
+- toggleOpen():void
+- area():number
+
+Shape Interface could be implemented by 
+class Rectangle
+- color: string
+- height: number
+- width: number
+- area():number
+
+class Circle
+- radius: number
+- area():number
+>首先将interface写入class，在集成了interface的同时，也集成了interface的方法，class里的方法也可以直接调用interface里的方法
+### Using static methods 
+Using static methods to return an pre-configured instance of class
+```ts
+export class Summary {
+  static winsAnalysisWithHtmlReport(team: string): Summary {
+    return new Summary(new WinsAnalysis('Man United'), new HtmlReport());
+  }
+
+  constructor(public analyzer: Analyzer, public outputTarget: OutputTarget) {}
+  buildAndPrintReport(matches: MatchData[]): void {
+    const output = this.analyzer.run(matches);
+    this.outputTarget.print(output);
+  }
+}
+```
+```ts
+export class MatchReader {
+  static fromCsv(filename: string): MatchReader {
+    return new MatchReader(new CsvFileReader(filename));
+  }
+
+  matches: MatchData[] = [];
+  constructor(public reader: DataReader) {}
+  load(): void {
+    this.reader.read();
+    this.matches = this.reader.data.map((row: string[]): MatchData => {
+      return [
+        dateStringToDate(row[0]),
+        row[1],
+        row[2],
+        parseInt(row[3]),
+        parseInt(row[4]),
+        row[5] as MatchResult,
+        row[6],
+      ];
+    });
+  }
+}
+```
