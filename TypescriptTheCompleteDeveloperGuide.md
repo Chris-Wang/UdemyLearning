@@ -1484,3 +1484,479 @@ function printSomething<T extends Printable>(arr:T[]):void{
   }
 }
 ```
+
+## Section 13: Let's Build a Web Framework
+
+## Section 14: Express + Typescript Integration
+
+## Section 17: React and Redux with Typescript
+npx create-react-app rrts --template typescript
+
+### Parsing Props
+```ts
+class App extends React.Component{
+  render() {
+    return <div>{this.props.color}</div>
+  }
+}
+
+ReactDOM.render(<App color='red'/>, document.querySelector('#root'));
+```
+需要添加props的泛型才能正确传值
+```ts
+interface AppProps{
+  color:string;
+}
+
+class App extends React.Component<AppProps>{
+  render() {
+    return <div>{this.props.color}</div>
+  }
+}
+```
+将color加上?，就可以使其变为optional，以下代码也不会报错
+```ts
+interface AppProps{
+  color?:string;
+}
+
+class App extends React.Component<AppProps>{
+  render() {
+    return <div>{this.props.color}</div>
+  }
+}
+ReactDOM.render(<App />, document.querySelector('#root'));
+```
+### 使用state
+```ts
+class App extends React.Component{
+  state={counter: 0};
+
+  onIncrement = ():void => {
+    this.setState({counter:this.state.counter +1});
+  }
+
+  onDecrement = ():void => {
+    this.setState({counter:this.state.counter -1});
+  }
+
+  render() {
+    return <div>
+    <button onClick = {this.onIncrement}>Increment</button>
+    <button onClick = {this.onDecrement}>Decrement</button>
+    {this.state.counter}</div>
+  }
+}
+```
+注意上面
+```ts
+  state={counter: 0};
+```
+这种写法，覆盖了源码对state的定义
+```ts
+  state:Readonly<S>;
+```
+因此，如果想使用constructor来初始化state，需要传入state的类型
+```ts
+interface AppProps{
+  color?:string;
+}
+
+interface AppState{
+  counter:number;
+}
+
+class App extends React.Component<AppProps,AppState>{
+  constructor(props:AppProps) {
+    super(props);
+
+    this.state = {counter:1};
+  }
+
+  onIncrement = ():void => {
+    this.setState({counter:this.state.counter +1});
+  } 
+
+  onDecrement = ():void => {
+    this.setState({counter:this.state.counter -1});
+  }
+
+  render() {
+    return <div>{this.props.color}
+    <button onClick = {this.onIncrement}>Increment</button>
+    <button onClick = {this.onDecrement}>Decrement</button>
+    {this.state.counter}</div>
+  }
+}
+```
+### Functional Components
+```ts
+const App = (props:AppProps):JSX.Element =>{
+  return <div>{props.color}</div>
+}
+```
+### Redux Setup
+npm i redux react-redux axios redux-thunk
+npm i @types/react-redux
+
+### Action Creators with Typescript
+注意需要导入Dispatch
+```ts
+import axios from 'axios';
+import { Dispatch } from 'redux';
+
+const url = 'https://jsonplaceholder.typicode.com/todos';
+
+export const fetchTodos = () => {
+  return async (dispatch: Dispatch) => {
+    const response = await axios.get(url);
+
+    dispatch({
+      type: 'FETCH_TODOS',
+      payload: response.data,
+    });
+  };
+};
+```
+在上面的代码中，我们发现，response的type是any，而且dispatch里type也是fixed的字符串，dispatch也并没有应用ts的规则
+### Refactor Action Creators
+1. 添加response interface，和 ActionType enum
+```ts
+import axios from 'axios';
+import { Dispatch } from 'redux';
+import { ActionTypes } from './types';
+
+interface Todo {
+  id: number;
+  title: string;
+  completed: boolean;
+}
+const url = 'https://jsonplaceholder.typicode.com/todos';
+
+export const fetchTodos = () => {
+  return async (dispatch: Dispatch) => {
+    const response = await axios.get<Todo[]>(url);
+
+    dispatch({
+      type: ActionTypes.fetchTodos,
+      payload: response.data,
+    });
+  };
+};
+```
+```ts
+export enum ActionTypes {
+  fetchTodos,
+}
+```
+2. 添加dispatch interface，确保dispatch有正确的action type和properties
+```ts
+interface FetchTodoAction {
+  type: ActionTypes.fetchTodos;
+  payload: Todo[];
+}
+const url = 'https://jsonplaceholder.typicode.com/todos';
+
+export const fetchTodos = () => {
+  return async (dispatch: Dispatch) => {
+    const response = await axios.get<Todo[]>(url);
+
+    dispatch<FetchTodoAction>({
+      type: ActionTypes.fetchTodos,
+      payload: response.data,
+    });
+  };
+};
+```
+### Reducers
+```ts
+import { Todo, FetchTodoAction } from './../actions';
+import { ActionTypes } from '../actions/types';
+
+export const todosReducer = (state: Todo[] = [], action: FetchTodoAction) => {
+  switch (action.type) {
+    case ActionTypes.fetchTodos:
+      return action.payload;
+    default:
+      return state;
+  }
+};
+```
+这里有个问题，action被全部定义为了FetchTodoAction
+
+### Refactor reducer index.ts
+```ts
+import { combineReducers } from 'redux';
+import { todosReducer } from './todo';
+import { Todo } from '../actions';
+
+export interface StoreState {
+  todos: Todo[];
+}
+
+export const reducers = combineReducers<StoreState>({
+  todos: todosReducer,
+});
+```
+### Connecting Redux to Component
+```ts
+import React from 'react';
+import { connect } from 'react-redux';
+import { Todo, fetchTodos } from '../actions';
+import { StoreState } from '../reducers';
+
+interface AppProps {
+  todos: Todo[];
+  fetchTodos(): any;
+}
+
+class _App extends React.Component<AppProps> {
+  render() {
+    return <div>Hi</div>;
+  }
+}
+
+const mapStateToProps = ({ todos }: StoreState): { todos: Todo[] } => {
+  return { todos };
+};
+
+export const App = connect(mapStateToProps, { fetchTodos })(_App);
+
+```
+### Rendering a List
+```ts
+import React from 'react';
+import { connect } from 'react-redux';
+import { Todo, fetchTodos } from '../actions';
+import { StoreState } from '../reducers';
+
+interface AppProps {
+  todos: Todo[];
+  fetchTodos(): any;
+}
+
+class _App extends React.Component<AppProps> {
+  onButtonClick = (): void => {
+    this.props.fetchTodos();
+  };
+
+  renderList(): JSX.Element[] {
+    return this.props.todos.map((todo: Todo) => {
+      return <div key={todo.id}>{todo.title}</div>;
+    });
+  }
+  render() {
+    console.log(this.props.todos);
+    return (
+      <div>
+        <button onClick={this.onButtonClick}>Fetch</button>
+        {this.renderList()}
+      </div>
+    );
+  }
+}
+
+const mapStateToProps = ({ todos }: StoreState): { todos: Todo[] } => {
+  return { todos };
+};
+
+export const App = connect(mapStateToProps, { fetchTodos })(_App);
+
+```
+### Adding delete action
+```ts
+import axios from 'axios';
+import { Dispatch } from 'redux';
+import { ActionTypes } from './types';
+
+export interface Todo {
+  id: number;
+  title: string;
+  completed: boolean;
+}
+
+export interface FetchTodoAction {
+  type: ActionTypes.fetchTodos;
+  payload: Todo[];
+}
+
+export interface DeleteTodoAction {
+  type: ActionTypes.deleteTodo;
+  payload: number;
+}
+
+const url = 'https://jsonplaceholder.typicode.com/todos';
+
+export const fetchTodos = () => {
+  return async (dispatch: Dispatch) => {
+    const response = await axios.get<Todo[]>(url);
+
+    dispatch<FetchTodoAction>({
+      type: ActionTypes.fetchTodos,
+      payload: response.data,
+    });
+  };
+};
+
+export const deleteTodo = (id:number):DeleteTodoAction => {
+  return{
+      type: ActionTypes.deleteTodo,
+      payload: id,
+  };
+};
+```
+### Breaking out Action index.ts
+把index.tx中的东西分离出去，然后将index.ts仅仅作为一个export汇总使用
+```ts
+//index.ts
+export * from './todos';
+export * from './types';
+
+```
+### define Action type
+为了reducer中Action的type使用，我们可以在types.ts中将actions 全部合并
+```ts
+import { FetchTodoAction, DeleteTodoAction } from './todos';
+
+export enum ActionTypes {
+  fetchTodos,
+  deleteTodo,
+}
+
+export type Action = FetchTodoAction | DeleteTodoAction;
+```
+### Add delete reducer
+```ts
+import { Todo, Action, ActionTypes } from './../actions';
+
+export const todosReducer = (state: Todo[] = [], action: Action) => {
+  switch (action.type) {
+    case ActionTypes.fetchTodos:
+      return action.payload;
+    case ActionTypes.deleteTodo:
+      return state.filter((todo: Todo) => todo.id !== action.payload);
+    default:
+      return state;
+  }
+};
+```
+### Wiring up deleteToDo and reducer to component
+```ts
+import React from 'react';
+import { connect } from 'react-redux';
+import { Todo, fetchTodos, deleteTodo } from '../actions';
+import { StoreState } from '../reducers';
+
+interface AppProps {
+  todos: Todo[];
+  fetchTodos: Function;
+  deleteTodo: typeof deleteTodo;
+}
+
+class _App extends React.Component<AppProps> {
+  onButtonClick = (): void => {
+    this.props.fetchTodos();
+  };
+
+  onTodoClick = (id: number): void => {
+    this.props.deleteTodo(id);
+  };
+
+  renderList(): JSX.Element[] {
+    return this.props.todos.map((todo: Todo) => {
+      return (
+        <div onClick={() => this.onTodoClick(todo.id)} key={todo.id}>
+          {todo.title}
+        </div>
+      );
+    });
+  }
+  render() {
+    console.log(this.props.todos);
+    return (
+      <div>
+        <button onClick={this.onButtonClick}>Fetch</button>
+        {this.renderList()}
+      </div>
+    );
+  }
+}
+
+const mapStateToProps = ({ todos }: StoreState): { todos: Todo[] } => {
+  return { todos };
+};
+
+export const App = connect(mapStateToProps, { fetchTodos, deleteTodo })(_App);
+```
+### using component level state
+```ts
+import React from 'react';
+import { connect } from 'react-redux';
+import { Todo, fetchTodos, deleteTodo } from '../actions';
+import { StoreState } from '../reducers';
+
+interface AppProps {
+  todos: Todo[];
+  fetchTodos: Function;
+  deleteTodo: typeof deleteTodo;
+}
+
+interface AppState {
+  fetching: boolean;
+}
+
+class _App extends React.Component<AppProps, AppState> {
+  constructor(props: AppProps) {
+    super(props);
+    this.state = { fetching: false };
+  }
+
+  componentDidUpdate(prevProps: AppProps): void {
+    if (!prevProps.todos.length && this.props.todos.length) {
+      this.setState({ fetching: false });
+    }
+  }
+
+  onButtonClick = (): void => {
+    this.props.fetchTodos();
+    this.setState({ fetching: true });
+  };
+
+  onTodoClick = (id: number): void => {
+    this.props.deleteTodo(id);
+  };
+
+  renderList(): JSX.Element[] {
+    return this.props.todos.map((todo: Todo) => {
+      return (
+        <div onClick={() => this.onTodoClick(todo.id)} key={todo.id}>
+          {todo.title}
+        </div>
+      );
+    });
+  }
+  render() {
+    console.log(this.props.todos);
+    return (
+      <div>
+        <button onClick={this.onButtonClick}>Fetch</button>
+        {this.state.fetching ? 'LOADING' : null}
+        {this.renderList()}
+      </div>
+    );
+  }
+}
+
+const mapStateToProps = ({ todos }: StoreState): { todos: Todo[] } => {
+  return { todos };
+};
+
+export const App = connect(mapStateToProps, { fetchTodos, deleteTodo })(_App);
+```
+### 总结
+- parsing interface for component generic type
+- init component state:
+  - use state={}
+  - or constructor
+- actions
+  - types.ts: all action types, action interface union
