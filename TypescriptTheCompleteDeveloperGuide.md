@@ -1960,3 +1960,130 @@ export const App = connect(mapStateToProps, { fetchTodos, deleteTodo })(_App);
   - or constructor
 - actions
   - types.ts: all action types, action interface union
+
+## Section 14: React.js & TypeScript
+create-react-app rts --typescript
+```ts
+import React from 'react';
+
+const App: React.FC = () => {
+  return <div>Hello</div>;
+};
+
+export default App;
+```
+FC stands for FunctionComponent
+npm install --save-dev @types/react-router-dom
+```ts
+//index.tsx
+import React from 'react';
+import ReactDOM from 'react-dom';
+import './index.css';
+import App from './App';
+
+ReactDOM.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+  document.getElementById('root')
+);
+
+```
+```ts
+//App.tsx
+import React, { useState } from 'react';
+import TodoList, { Todo } from './components/TodoList';
+import NewTodo from './components/NewTodo';
+
+const App: React.FC = () => {
+  const [todos, setTodos] = useState<Todo[]>([
+    { id: 't1', text: 'Finish the course' },
+  ]);
+  const todoAddHandler = (text: string) => {
+    setTodos((prevTodos) => [
+      ...prevTodos,
+      { id: Math.random().toString(), text: text },
+    ]);
+  };
+
+  const todoDeleteHandler = (todoId: string) => {
+    setTodos((prevTodos) => {
+      return prevTodos.filter((todo) => todo.id !== todoId);
+    });
+  };
+  return (
+    <div>
+      <NewTodo onAddTodo={todoAddHandler} />
+      <TodoList items={todos} onDelete={todoDeleteHandler} />
+    </div>
+  );
+};
+
+export default App;
+
+```
+```ts
+//NewTodo.tsx
+import React, { useRef } from 'react';
+import './NewTodo.css';
+// import {Router} from 'react-router-dom'
+
+export interface NewTodoProps {
+  onAddTodo: (todoText: string) => void;
+}
+
+const NewTodo: React.FC<NewTodoProps> = (props) => {
+  const textInputRef = useRef<HTMLInputElement>(null);
+
+  const todoSubmitHandler = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    const enteredText = textInputRef.current!.value;
+    props.onAddTodo(enteredText);
+  };
+
+  return (
+    <form onSubmit={todoSubmitHandler}>
+      <div className="form-control">
+        <label htmlFor="todo-text">Todo Text</label>
+        <input type="text" id="todo-text" ref={textInputRef} />
+      </div>
+      <button type="submit">ADD TODO</button>
+    </form>
+  );
+};
+
+export default NewTodo;
+
+```
+```ts
+//TodoList.tsx
+import React from 'react';
+import './TodoList.css';
+
+export interface Todo {
+  id: string;
+  text: string;
+}
+
+export interface TodoListProps {
+  items: Todo[];
+  onDelete: (todoId: string) => void;
+}
+
+const TodoList: React.FC<TodoListProps> = (props) => {
+  return (
+    <ul>
+      {props.items.map((todo) => (
+        <li key={todo.id} onClick={props.onDelete.bind(null, todo.id)}>
+          {todo.text}
+          <button onClick={props.onDelete.bind(null, todo.id)}>DELETE</button>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+export default TodoList;
+
+```
