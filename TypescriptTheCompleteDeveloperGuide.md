@@ -1488,6 +1488,271 @@ function printSomething<T extends Printable>(arr:T[]):void{
 ## Section 13: Let's Build a Web Framework
 
 ## Section 14: Express + Typescript Integration
+mkdir server
+npm init -y
+tsc --init
+npm i concurrently nodemon
+change 'outDir' 'rootDir'
+change scripts in package.json
+npm i express body-parser cookie-session
+npm i @types/express @types/cookie-session @types/body-parser
+
+### TS with JS Libs
+- use the lib normally, adding in basic type annotations where possible
+- use a TS adapter library that has helpers for using your lib with TS
+- Twist your lib to work with TS classes
+
+Middleware: take in some object from request to response, add or remove or change properties from it 
+
+Middleware 存在TS中的问题：
+- Middleware会在request中添加，删除或修改信息，但是TS无法获取这类修改信息
+- 对于某些type defination file，里面的属性类型仅仅标记为了any
+
+如何去修正response的type问题，首先，我们在type defination file中定义
+```ts
+body:{[key: string]:string | undefined}
+```
+然后再routes中写入
+```ts
+const {email} = req.body
+if(email){
+  res.send(email.toUpperCase());
+}else{
+  res.send('You must provide an email property');
+}
+```
+但是我们实际中并不能够修改type definition file
+### 修正request中的type问题
+```ts
+import { Router, Request, Response } from 'express';
+
+interface RequestWithBody extends Request {
+  body: { [key: string]: string | undefined };
+}
+
+const router = Router();
+router.get('/login', (req: Request, res: Response) => {
+  res.send(`
+  <form method="post">
+    <div>
+      <label>Email</label>
+      <input name='email'/>
+    </div>
+    <div>
+      <label>Password</label>
+      <input name='password' type="password"/>
+    </div>
+    <button>Submit</button>
+  </form>
+  `);
+});
+
+router.post('/login', (req: RequestWithBody, res: Response) => {
+  const { email, password } = req.body;
+
+  if (email && password) {
+    res.send(email.toUpperCase() + password.toUpperCase());
+  } else {
+    res.send('You must provide an email and password property');
+  }
+});
+
+export { router };
+```
+### Prototype Inheritance
+```ts
+class Boat{
+  pilot():void {
+    console.log('switch');
+  }
+}
+```
+其实会被转编译为prototype
+```js
+function Boat();
+
+Boat.prototype.pilot = function (){
+  console.log('switch');
+}
+```
+对于任一个新的function,我们都可以通过
+```js
+Boat.protoype.sink = function() {
+  console.log('switch');
+}
+```
+来添加新的方法
+## Section 15: Decorators
+tsc --init
+uncomment
+```ts
+ "experimentalDecorators": true,                 
+"emitDecoratorMetadata": true,  
+```
+Decorators on a property, method, accessor
+- first argument is the prototype of the object(class)
+- second argument is the key of the property/method/accessor on the object: 变量名，方法名
+- third argument is the property descriptor
+- decorators are applied when the code for the class is ran(not when an instance is created): decorator只有在class define的时候才会使用，且仅执行一次
+```ts
+class Boat {
+  color: string = 'red';
+
+  get formattedColor(): string {
+    return `This color is ${this.color}`;
+  }
+
+  @testDecorator
+  pilot(): void {
+    console.log('swish');
+  }
+}
+
+function testDecorator(target: any, key: string): void {
+  console.log('Target:', target);
+  console.log('Key:', key);
+}
+```
+其中的@testDecorator，仅仅相当于下面这句
+```ts
+testDecorator(Boat.prototype, 'pilot');
+```
+
+### Property Descriptors
+- configurable
+- enumerable
+- value
+- writable
+```ts
+class Boat {
+  color: string = 'red';
+
+  get formattedColor(): string {
+    return `This color is ${this.color}`;
+  }
+
+  pilot(): void {
+    console.log('swish');
+  }
+
+  @logError
+  test(): void {
+    throw new Error();
+  }
+}
+
+function logError(target: any, key: string, desc: PropertyDescriptor): void {
+  const method = desc.value;
+  desc.value = function () {
+    try {
+      method();
+    } catch (e) {
+      console.log('sunk');
+    }
+  };
+}
+
+new Boat().test();
+```
+### Parsing argument for decorators: decorator factory
+```ts
+class Boat {
+  color: string = 'red';
+
+  get formattedColor(): string {
+    return `This color is ${this.color}`;
+  }
+
+  pilot(): void {
+    console.log('swish');
+  }
+
+  @logError('Oops it was sunk')
+  test(): void {
+    throw new Error();
+  }
+}
+
+function logError(message: string){
+return function(target: any, key: string, desc: PropertyDescriptor): void {
+  const method = desc.value;
+  desc.value = function () {
+    try {
+      method();
+    } catch (e) {
+      console.log(message);
+    }
+  };
+}}
+
+new Boat().test();
+
+```
+Decorator对于property而言，只能访问到他的key，而不能更改或者访问这个key的value;而target拿到的，也仅仅是他的prototype method
+```ts
+class Boat {
+  @testDecorator
+  color: string = 'red';
+
+  get formattedColor(): string {
+    return `This color is ${this.color}`;
+  }
+
+  pilot(): void {
+    console.log('swish');
+  }
+
+  test(): void {
+    throw new Error();
+  }
+}
+
+function testDecorator(target: any, key: string): void {
+  console.log(target);
+  console.log(key);
+}
+
+```
+### Parameter Decorator
+用来绑定parameter的decorator
+```ts
+class Boat {
+  color: string = 'red';
+
+  pilot(
+    @parameterDecorator speed: string,
+    @parameterDecorator brand: string
+  ): void {
+    console.log('swish', speed);
+  }
+
+}
+
+function parameterDecorator(target: Boat, key: string, index: number): void {
+  console.log(key, index);
+}
+
+```
+### Class Decorator
+```ts
+@classDecorator
+class Boat {
+  color: string = 'red';
+
+  get formattedColor(): string {
+    return `This color is ${this.color}`;
+  }
+
+  test(): void {
+    throw new Error();
+  }
+}
+
+
+function classDecorator(constructor: typeof Boat) {
+  console.log(constructor);
+}
+```
 
 ## Section 17: React and Redux with Typescript
 npx create-react-app rrts --template typescript
