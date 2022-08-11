@@ -260,6 +260,7 @@ const app = Vue.createApp({
       - `v-on:click.right`:右键单击
       - `v-on:click.middle`:中键单击
       - `v-on:click.keyup`:某键抬起
+      - `v-on:click.stop`:停止事件冒泡
 
   ```js
   confirmInput() {
@@ -425,4 +426,95 @@ watch:{
   },
   ```
 
-  ## Section 3: Rendering Conditional Content & Lists
+## Section 3: Rendering Conditional Content & Lists
+
+### v-if
+
+使用 v-if 来直接动态渲染某个标签，其中 v-if 后面可以跟随数据，也可以跟随表达式
+
+```html
+<p v-if="goals.length===0">
+  No goals have been added yet - please start adding some!
+</p>
+```
+
+v-else 必须紧跟着 v-if
+
+```html
+<p v-if="goals.length===0">
+  No goals have been added yet - please start adding some!
+</p>
+<ul v-else>
+  <li>Goal</li>
+</ul>
+```
+
+v-else-if 可以紧跟着判断
+
+```html
+<p v-if="goals.length===0">
+  No goals have been added yet - please start adding some!
+</p>
+<ul v-else-if="goals.length>0">
+  <li>Goal</li>
+</ul>
+```
+
+### v-show
+
+可以单独出现，用法也与 v-if 相似，后面跟条件
+
+```html
+<p v-show="goals.length===0">
+  No goals have been added yet - please start adding some!
+</p>
+```
+
+不同点在于，v-show 通过 css 的 display:true/none 来隐藏显示的内容，v-if 则是真的不挂载渲染节点；通常情况下使用 v-if 要优先于 v-show，因为我们不希望隐藏大部分不需要渲染的节点；当一块元素需要频繁切换显示状态的时候，我们可以使用 v-show
+
+### v-for
+
+v-for 后面可以跟表达式来直接循环渲染，注意表达式中取出的单个数据变量，仅能在 v-for 的标签间使用
+
+```html
+<li v-for="goal in goals">{{goal}}</li>
+<li v-for="(goal, index) in goals">{{ goal }} - {{index}}</li>
+```
+
+v-for 不仅可以 loop array，还可以 loop object，并且取到里面的 key
+
+```html
+<li v-for="(value,key) in {name: 'Max',age:31} ">{{key}}:{{ value }}</li>
+```
+
+v-for 还可以 loop num，
+
+```html
+<li v-for="num in 10 ">{{num}}</li>
+```
+
+v-for 中还可以添加事件
+
+```js
+<li v-for="(goal, index) in goals" @click="removeGoal(index)">
+  {{ goal }} - {{index}}
+</li>
+
+methods: {
+    addGoal() {
+      this.goals.push(this.enteredValue);
+    },
+    removeGoal(index) {
+      this.goals.splice(index, 1);
+    },
+},
+```
+
+当使用 for 进行渲染的时候，如果没有 key 绑定每一个 element，那么 vue 可能不会变动 node，而只是变更 node 内的部分内容，因此需要添加 key 给每一个 element，key 是一个 vue 添加的标签
+
+```html
+<li v-for="(goal, index) in goals" :key="goal" @click="removeGoal(index)">
+  <p>{{ goal }} - {{index}}</p>
+  <input type="text" @click.stop />
+</li>
+```
