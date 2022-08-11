@@ -518,3 +518,74 @@ methods: {
   <input type="text" @click.stop />
 </li>
 ```
+
+## Section 4: Course Project: The Monster Slayer Game
+
+- 生成 min ～ max 之间的 random number：
+  ```js
+  Math.floor(Math.random() * (max - min)) + min;
+  ```
+- 从 array 中移除一个元素
+  ```js
+  this.goals.splice(index, 1);
+  ```
+- methods 中可以使用 this 来调用其他 methods
+  ```js
+   methods: {
+    attack() {
+      this.monsterHealth -= getRandomValue(5,12);
+      this.beAttacked();
+    },
+    beAttacked() {
+      this.playerHealth -= getRandomValue(8,15);
+    },
+  },
+  ```
+- inline style 的写法
+  ```html
+  <div
+    class="healthbar__value"
+    :style="{width:playerHealth + '%'}"
+    :value="playerHealth"
+  ></div>
+  ```
+- 使用 computed property 来提取 inline 的逻辑
+
+  ```js
+  <div
+    class="healthbar__value"
+    :style="getPlayerHealthBar"
+    :value="playerHealth"
+  ></div>
+
+  computed: {
+    getPlayerHealthBar() {
+      return { width: this.playerHealth + '%' };
+    },
+  },
+  ```
+
+- 使用 computed property 来拿到判断返回值
+
+  ```js
+  <button :disabled="getSpecialAttackDisable" @click="specialAttack">
+    SPECIAL ATTACK
+  </button>
+
+  computed: {
+    getSpecialAttackDisable() {
+      return this.currentRound % 3 !== 0;
+    },
+  },
+  ```
+
+- 使用 unshift，将内容插入到 array 头部
+  ```js
+  addLogMessage(who, action, value) {
+      this.logMessages.unshift({
+        actionBy: who,
+        actionType: action,
+        actionValue: value,
+      });
+  },
+  ```
