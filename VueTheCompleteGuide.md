@@ -690,9 +690,9 @@ beforeCreate() -> created() -> [compile template] -> beforeMount() -> mounted()
 
 ```
 
-## Section 6: Introducing Components
+## Section 6 : Introducing Components
 
-我们可以把单独一部分 html 抽出来，在里面封装好数据和逻辑，做成一个独立的组件
+我们可以把单独一部分 html 抽出来，在里面封装好数据和逻辑，做成一个独立的组件，每一个组件就像一个 mini app
 
 ```js
 app.component('friend-contact', {
@@ -726,3 +726,19 @@ app.component('friend-contact', {
 ```
 
 注意，component 的命名必须区别于 html 默认标签，因此使用两个单词相连中间加“-”的形式是有必要的
+
+## Section 7 : Vue CLI
+
+vue create vue-test-app
+
+### vue file
+
+- template
+- script
+- style
+
+默认情况下，创建 App.vue，用来存放 app 的配置信息
+
+'./'开始为相对路径，指向与该文件同级的位置
+
+## Section 8 : Component Communication
