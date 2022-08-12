@@ -689,3 +689,40 @@ beforeCreate() -> created() -> [compile template] -> beforeMount() -> mounted()
   },
 
 ```
+
+## Section 6: Introducing Components
+
+我们可以把单独一部分 html 抽出来，在里面封装好数据和逻辑，做成一个独立的组件
+
+```js
+app.component('friend-contact', {
+  template: `
+  <li  key={{friend.id}}>
+    <h2>{{friend.name}}</h2>
+      <button @click="toggleDetails">Show Details</button>
+      <ul v-show="showDetails">
+        <li><strong>Phone:</strong>{{friend.phone}}</li>
+        <li><strong>Email:</strong>{{friend.email}}</li>
+      </ul>
+  </li>
+  `,
+  data() {
+    return {
+      showDetails: true,
+      friend: {
+        id: 'manuel',
+        name: 'Manuel Lorenz',
+        phone: '01234 5678 991',
+        email: 'manuel@localhost.com',
+      },
+    };
+  },
+  methods: {
+    toggleDetails() {
+      this.showDetails = !this.showDetails;
+    },
+  },
+});
+```
+
+注意，component 的命名必须区别于 html 默认标签，因此使用两个单词相连中间加“-”的形式是有必要的
