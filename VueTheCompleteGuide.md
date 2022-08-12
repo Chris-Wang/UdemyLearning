@@ -742,3 +742,292 @@ vue create vue-test-app
 './'开始为相对路径，指向与该文件同级的位置
 
 ## Section 8 : Component Communication
+
+### 父传子
+
+- props
+  - 在子组件中定义，一旦定义后就跟 data 一样，可以在全局使用
+  - 传递过来的 props，在子组件中是无法更改的
+  - props 的命名遵循驼峰法
+  ```vue
+  <template>
+    <li>
+      <h2>{{ name }}</h2>
+      <button @click="toggleDetails()">
+        {{ detailsAreVisible ? 'Hide' : 'Show' }} Details
+      </button>
+      <ul v-if="detailsAreVisible">
+        <li><strong>Phone:</strong> {{ phoneNumber }}</li>
+        <li><strong>Email:</strong> {{ emailAddress }}</li>
+      </ul>
+    </li>
+  </template>
+  <script>
+  export default {
+    props: ['name', 'phoneNumber', 'emailAddress'],
+    data() {
+      return {
+        detailsAreVisible: false,
+        friend: {
+          id: 'manuel',
+          name: 'Manuel Lorenzo',
+          phone: '01234 5678 991',
+          email: 'manuel@localhost.com',
+        },
+      };
+    },
+    methods: {
+      toggleDetails() {
+        this.detailsAreVisible = !this.detailsAreVisible;
+      },
+    },
+  };
+  </script>
+  ```
+  - props 的定义中可以添加相关的属性，以及 validator，如果父组件传值，在 console 中 vue 会给出 warning
+    ```js
+    props: {
+      name: { type: String, required: true },
+      phoneNumber: { type: String, required: true },
+      emailAddress: { type: String, required: true },
+      isFavorite: {
+        type: String,
+        required: false,
+        default: '0',
+        validator: function (value) {
+          return value == '0' || value == '1';
+        },
+      },
+    },
+    ```
+  - 通过父组件的标签属性来传递，标签属性的命名在父组件中由驼峰转换成了
+    "-"与小写
+  ```vue
+  <template>
+    <header><h1>My Friends</h1></header>
+    <ul>
+      <friend-contact
+        name="manuel"
+        phone-number="01234 5678 991"
+        email-address="manuel@localhost.com"
+      ></friend-contact>
+      <friend-contact
+        name="julie"
+        phone-number="09876 543 221"
+        email-address="julie@localhost.com'"
+      ></friend-contact>
+    </ul>
+  </template>
+  ```
+  - 在父组件中，传递的 props value 只能是字符串，因此，当出现非字符串类型时，需要 v-bind
+  ```html
+  <ul>
+    <friend-contact
+      name="manuel"
+      phone-number="01234 5678 991"
+      email-address="manuel@localhost.com"
+      :is-favorite="true"
+    ></friend-contact>
+    <friend-contact
+      name="julie"
+      phone-number="09876 543 221"
+      email-address="julie@localhost.com'"
+      :is-favorite="false"
+    ></friend-contact>
+  </ul>
+  ```
+  - 父组件也可以通过 v-for 来进行将自身的 data 值传递给 props，需要注意的是所有的数据均需要 bind
+  ```html
+  <ul>
+    <friend-contact
+      v-for="friend in friends"
+      :key="friend.id"
+      :name="friend.name"
+      :phone-number="friend.phone"
+      :email-address="friend.email"
+      :is-favorite="friend.fav"
+    ></friend-contact>
+  </ul>
+  ```
+
+### 子传父
+
+- 子组件可以通过 emit custom events 的方法，令父组件监听该事件，当捕捉到事件触发时，执行对应的方法；父组件里监听的绑定事件名，要与子组件里 emit 的一致
+- $emit 的第二个及往后的参数，将作为参数依次传递给父组件的方法
+  子组件：
+
+  ```
+  <button @click="toggleFavorite()">
+      {{ isFavorite ? 'UnFav' : 'Fav' }}
+  </button>
+
+  methods: {
+    toggleFavorite() {
+      this.$emit('toggle-favorite', this.id);
+    },
+  },
+  ```
+
+  父组件：
+
+  ```
+  <ul>
+    <friend-contact
+      v-for="friend in friends"
+      :key="friend.id"
+      :id="friend.id"
+      :name="friend.name"
+      :phone-number="friend.phone"
+      :email-address="friend.email"
+      :is-favorite="friend.fav"
+      @toggle-favorite="toggleFavorite"
+    ></friend-contact>
+  </ul>
+
+  methods: {
+    toggleFavorite(id) {
+      const friend = this.friends.find((f) => f.id === id);
+      friend.fav = !friend.fav;
+    },
+  }
+  ```
+
+  - 子组件中，我们也可以直接在标签里 emit
+
+  ```html
+  <button @click="$emit('delete-contact', id)">Delete</button>
+  ```
+
+  - 如果 emit 事件时 passthrough，即父传子，子传孙子，则在子中的写法即为, 第二个参数为$event
+
+  ```html
+  <knowledge-grid
+    :topics="topics"
+    @select-topic="$emit('select-topic', $event)"
+  ></knowledge-grid>
+  ```
+
+  - 从 array 中取到对应 id 的 object
+
+  ```js
+  const friend = this.friends.find((f) => f.id === id);
+  ```
+
+  - 从 array 中移除对应 id 的 object
+
+  ```js
+  this.friends = this.friends.filter((f) => f.id !== id);
+  ```
+
+### emits
+
+- 为了更方便的管理，我们可以在 emits 这个 property 里注册需要 emit 的事件
+
+```js
+emits: ['toggle-favorite'],
+```
+
+- 一种更为详细的写法是，我们可以在 emits 里详细定义事件的类型，和对应该事件会执行的部分逻辑，注意对象类型是 function 的时候，参数为$emit 的第二个参数，即为向父组件发送的数据
+
+```js
+  emits: {
+    'toggle-favorite': function (id) {
+      if (id) {
+        return true;
+      } else {
+        return false;
+      }
+    },
+  },
+```
+
+### provide/inject
+
+- 解决祖孙组件之间的通信问题，除了传统的逐层传递，还可以将祖父组件想要传递的信息放入 provide，再在子孙的 inject 属性中提取，即可实现数据共享
+- 两者必须是一条分支下来的关系，比如祖父-孙子
+- provides 与 inject 可以解决祖孙节点的传值，而且是中间经过的节点不会再看到需要传递的数据或方法，但是默认情况下如果在祖孙之间并不存在太多层，则不建议使用该方法，因为会大大降低代码可读性。我们仅仅在祖父节点中定义了 provide，但是却不知道他会在哪里被使用，同样道理，我们在子孙节点中使用了 inject，我们却不知道是哪里来的 provide
+  祖父组件：
+
+```js
+provide() {
+    return { topics: this.topics };
+},
+```
+
+孙子组件：
+
+```js
+export default {
+  inject: ['topics'],
+  emits: ['select-topic'],
+};
+```
+
+- 方法也可以依照此来传递，需要注意的是，传递方法的时候，provide 仅仅填的是注册的引用名和指向的具体方法，在子孙组件中，如果该方法需要参数，需要记得添加
+  祖父组件
+
+```vue
+<template>
+  <div>
+    <active-element
+      :topic-title="activeTopic && activeTopic.title"
+      :text="activeTopic && activeTopic.fullText"
+    ></active-element>
+    <knowledge-base :topics="topics"></knowledge-base>
+  </div>
+</template>
+<script>
+export default {
+  data() {
+    return {
+      topics: [
+        {
+          id: 'basics',
+          title: 'The Basics',
+          description: 'Core Vue basics you have to know',
+          fullText:
+            'Vue is a great framework and it has a couple of key concepts: Data binding, events, components and reactivity - that should tell you something!',
+        },
+        {
+          id: 'components',
+          title: 'Components',
+          description:
+            'Components are a core concept for building Vue UIs and apps',
+          fullText:
+            'With components, you can split logic (and markup) into separate building blocks and then combine those building blocks (and re-use them) to build powerful user interfaces.',
+        },
+      ],
+      activeTopic: null,
+    };
+  },
+  provide() {
+    return { topics: this.topics, selectTopic: this.activateTopic };
+  },
+  methods: {
+    activateTopic(topicId) {
+      this.activeTopic = this.topics.find((topic) => topic.id === topicId);
+    },
+  },
+};
+</script>
+```
+
+子孙组件
+
+```vue
+<template>
+  <li>
+    <h3>{{ topicName }}</h3>
+    <p>{{ description }}</p>
+    <button @click="selectTopic(id)">Learn More</button>
+  </li>
+</template>
+
+<script>
+export default {
+  inject: ['selectTopic'],
+  props: ['id', 'topicName', 'description'],
+  emits: ['select-topic'],
+};
+</script>
+```
