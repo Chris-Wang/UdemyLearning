@@ -589,3 +589,103 @@ methods: {
       });
   },
   ```
+
+## Section 5: How Vue Works
+
+### Reactivity
+
+Vue 中使用了类似 JS Proxy 的机制，使得数据与 html 的渲染或者其他数据进行了绑定，这样在该数据变化的同时，被绑定的部分也会自动更新
+
+```js
+const data = {
+  message: 'Hello!',
+  longMessage: 'Hello! World!',
+};
+
+const handler = {
+  set(target, key, value) {
+    if (key === 'message') {
+      target.longMessage = value + ' World!';
+    }
+    target.message = value;
+  },
+};
+
+const proxy = new Proxy(data, handler);
+proxy.message = 'Hello!!!!';
+console.log(proxy.longMessage);
+```
+
+### template
+
+让 vue 来控制渲染的 html 的部分，我们可以叫他 template；我们可以在 template 中定义要控制渲染的内容，再通过 mount 的方式，来挂载改节点
+
+```js
+<section id="app2"></section>;
+
+const app2 = Vue.createApp({
+  template: `
+    <p>{{ favoriteMeal }}</p>
+  `,
+  data() {
+    return {
+      favoriteMeal: 'Pizza',
+    };
+  },
+});
+
+app2.mount('#app2');
+```
+
+### ref
+
+在某些场景下，我们并不想做双向绑定，而是想更灵活的控制某个 element，这时候我们可以使用 ref 来锁定这个 element，通过$refs 找到它，并加以处理
+
+```js
+<input type="text" ref="userText" >
+methods: {
+    setText() {
+      this.message = this.$refs.userText.value;
+    },
+  },
+```
+
+### How Vue Updates the DOM
+
+- Vue Instance 包含了我们写的 Vue code：data，methods，computed...
+- Browser DOM 则是我们通过 Vue controlled template 最终渲染的地方
+- Virtual DOM 存在于前面两者之间，仅存在于内存中，当每次 Vue Instance 更新，virtual dom 会进行比较，只有更新的/不同的部分会渲染到真实 DOM 中
+
+### Vue lifecycle
+
+beforeCreate() -> created() -> [compile template] -> beforeMount() -> mounted()
+[Mounted Vue Instance, Data Changed] -> beforeUpdated() -> updated()
+[instance unmounted] -> beforeUnmount() -> unmounted() 一般我们都不会 unmount
+
+```js
+  beforeCreate() {
+    console.log('beforeCreate()');
+  },
+  created() {
+    console.log('created()');
+  },
+  beforeMount() {
+    console.log('beforeMount()');
+  },
+  mounted() {
+    console.log('mounted()');
+  },
+  beforeUpdate() {
+    console.log('beforeUpdate()');
+  },
+  updated() {
+    console.log('updated()');
+  },
+  beforeUnmount() {
+    console.log('beforeUnmount()');
+  },
+  unmounted() {
+    console.log('unmounted()');
+  },
+
+```
