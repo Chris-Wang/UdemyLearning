@@ -1470,3 +1470,272 @@ https://v2.vuejs.org/v2/style-guide/?redirect=true
 - ui 下面放 base 组件
 - layout 下面放 theHeader 类
 - 各类 feature 组件可以放到以 feature 命名的文件夹下
+
+## Section 10: Course Project: The Learning Resources App
+
+### props
+
+从父组件传递 props 的时候，对于使用 data 里的变量，标签的属性前一定要 bind，不然传递不了
+
+```vue
+<template>
+  <ul>
+    <res-card v-for="res in storedRes" :key="res.id" :res="res"></res-card>
+  </ul>
+</template>
+```
+
+- 对于 Base 的组件，一般是在 main.js 里做全局导入
+- 引用自定义组件时，传入的 event，会自动落入组件的 root node，比如下面就会落入 base-button 的 root，即加入<button>里
+
+```vue
+<base-button @click="changePanel">{{
+      activePanel === 'learning-res' ? 'Adding Res' : 'View Res'
+    }}
+</base-button>
+```
+
+- 对于 dynamic 组件的 props，我们既可以通过 props 来传递
+
+```vue
+<component :is="activePanel" :storedRes="storedRes"></component>
+```
+
+也可以通过 provide/inject 来完成
+祖先组件
+
+```vue
+<base-card>
+    <base-button @click="changePanel">{{
+      activePanel === 'learning-res' ? 'Adding Res' : 'View Res'
+    }}</base-button>
+  </base-card>
+<component :is="activePanel"></component>
+
+<script>
+export default {
+  components: {
+    LearningRes,
+    TheHeader,
+    AddingRes,
+  },
+  data() {
+    return {
+      activePanel: 'learning-res',
+      storedRes: [],
+    };
+  },
+  provide() {
+    return {
+      storedRes: this.storedRes,
+    };
+  },
+};
+</script>
+```
+
+子孙组件
+
+```vue
+<script>
+export default {
+  inject: ['storedRes'],
+};
+</script>
+```
+
+- form 的 submit button 方法可以写在 form 标签内
+- 除了用 v-model 可以做数据同步，还可以用 ref
+- 对于动态组件中的 emit 事件发送与接受，也可以使用 provide/inject
+  父组件
+
+```vue
+<template>
+  <the-header title="Remember ME"> </the-header>
+  <base-card>
+    <base-button @click="changePanel">{{
+      activePanel === 'learning-res' ? 'Adding Res' : 'View Res'
+    }}</base-button>
+  </base-card>
+  <component :is="activePanel"></component>
+</template>
+<script>
+export default {
+  data() {
+    return {
+      activePanel: 'learning-res',
+      storedRes: [],
+    };
+  },
+  provide() {
+    return {
+      storedRes: this.storedRes,
+      addResource: this.addRes,
+    };
+  },
+  methods: {
+    addRes(res) {
+      this.storedRes.unshift(res);
+    },
+  },
+};
+</script>
+```
+
+子组件
+
+```vue
+<template>
+  <base-card>
+    <form @submit.prevent="submitResource">
+      <header>
+        <h3>Add a Resource</h3>
+      </header>
+      <div class="form-control">
+        <label for="title">Title</label>
+        <input type="text" id="title" ref="titleInput" />
+      </div>
+      <div class="form-control">
+        <label for="description">Description</label>
+        <textarea name="description" id="description" ref="desInput" row="3" />
+      </div>
+      <div class="form-control">
+        <label for="link">Link</label>
+        <input type="url" name="link" id="link" ref="linkInput" />
+      </div>
+      <div>
+        <base-button type="submit">Add</base-button>
+      </div>
+    </form>
+  </base-card>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      isSubmitted: false,
+      isError: false,
+    };
+  },
+  inject: ['addResource'],
+  methods: {
+    submitResource() {
+      if (
+        this.$refs.titleInput.value.trim() === '' ||
+        this.$refs.desInput.value.trim() === '' ||
+        this.$refs.linkInput.value.trim() === ''
+      ) {
+        this.setIsError();
+        return;
+      }
+      this.addResource({
+        id: Date.now().toString(),
+        title: this.$refs.titleInput.value,
+        description: this.$refs.desInput.value,
+        link: this.$refs.linkInput.value,
+      });
+      this.setIsSubmitted();
+      this.$refs.titleInput.value = '';
+      this.$refs.desInput.value = '';
+      this.$refs.linkInput.value = '';
+    },
+  },
+};
+</script>
+```
+
+- 向 array 插入一个数据，并将该数据置顶
+
+```js
+this.storedRes.unshift(res);
+```
+
+- 除掉输入中的开头空格
+
+```js
+this.$refs.titleInput.value.trim();
+```
+
+- 在 dialog 实现点击背景关闭功能，可以通过在 dialog 的 root 节点添加 emit 事件完成
+
+```vue
+<template>
+  <teleport to="body">
+    <div @click="$emit('close')"></div>
+    <dialog open>
+      <header>
+        <slot name="header">
+          <h2>{{ title }}</h2>
+        </slot>
+      </header>
+      <section>
+        <slot></slot>
+      </section>
+      <menu>
+        <slot name="actions">
+          <base-button @click="$emit('close')">Close</base-button>
+        </slot>
+      </menu>
+    </dialog>
+  </teleport>
+</template>
+
+<script>
+export default {
+  props: {
+    title: {
+      type: String,
+      required: false,
+    },
+  },
+  emits: ['close'],
+};
+</script>
+```
+
+- 在 provide/inject 过程中，如果父组件 provide 的数据中，在方法中进行了重新赋值，则新的数据并不会自动更新到 provide 的全局数据中，因此对操作的 provide 相关数据，必须直接操作
+
+```js
+export default {
+
+  data() {
+    return {
+      storedRes: [
+        {
+          id: 'official-guide',
+          title: 'Official Guide',
+          description: 'The official Vue.js documentation.',
+          link: 'https://vuejs.org',
+        },
+      ],
+    };
+  },
+  provide() {
+    return {
+      storedRes: this.storedRes,
+    };
+  },
+
+  methods: {
+    addRes(res) {
+      this.storedRes.unshift(res);
+      this.activePanel = 'learning-res';
+    },
+    removeRes(id) {
+      //注释中的方法不会生效，因为provide中的地址并不会更新
+      // this.storedRes = this.storedRes.filter((r) => r.id !== id);
+      const resIndex = this.storedRes.findIndex((res) => res.id === id);
+      this.storedRes.splice(resIndex, 1);
+    },
+  },
+};
+</script>
+```
+
+- 根据 id 查找数据，并将之删除
+
+```js
+const resIndex = this.storedRes.findIndex((res) => res.id === id);
+this.storedRes.splice(resIndex, 1);
+```
