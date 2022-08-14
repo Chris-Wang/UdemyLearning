@@ -1031,3 +1031,442 @@ export default {
 };
 </script>
 ```
+
+## Section 9: Diving Deeper Into Components
+
+### Global VS Local Components
+
+- 在 main.js 中通过 app.component 注册的，是 global component，可以在整个项目中作为自定义 html 标签使用
+- global component 会在 app 加载的时候同时加载（load）
+
+### components
+
+- 可以将组件使用到的 component，通过 import，加 components property 注册的方式，引入它，此时它仅会在引用它的 component 中使用，是一个 local component
+- 注意，注册 component 时 key 填的是作为使用的标签，后面跟的是具体引用
+
+  ```js
+  import TheHeader from './components/TheHeader.vue';
+  export default {
+    components: {
+      'the-header': TheHeader,
+    },
+    data() {
+      return {
+        activeUser: {
+          name: 'Maximilian Schwarzmüller',
+          description: 'Site owner and admin',
+          role: 'admin',
+        },
+      };
+    },
+  };
+  ```
+
+- 注册 component 填入的 key，也可以是 pascal case 例如
+
+  ```js
+  components: {
+    TheHeader: TheHeader,
+  },
+  ```
+
+  此时在 template 中的引用，既可以是 TheHeader 标签，也可以是 the-header，后者为 Vue 自动生成，需要注意的是，如果使用后者，则无法添加自闭合
+
+  ```js
+  <the-header></the-header>
+  <TheHeader />
+  ```
+
+  同时,在 js 语法中，如果 key 与 value 相同，则 key 可以省略
+
+  ```js
+  <the-header></the-header>
+  <TheHeader />
+
+  components: {
+    TheHeader,
+  },
+  ```
+
+### scoped styling
+
+如果是在 vue 文件<style></style>之间加的 style，默认会作用到整个 app，如果想限定该段 style 仅作用于当前组件，需要加 scoped，例如
+
+```vue
+<style scoped>
+header {
+  width: 100%;
+  height: 5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #14005e;
+}
+
+header h1 {
+  color: white;
+  margin: 0;
+}
+</style>
+```
+
+### slot
+
+类似于 react 中的 layout，如果我们想定义一个 wrapper 类型的 component，这个 component 用于包裹其它的 component，这时候就可以用插槽 slot，<slot></slot>之间即为装配的 children component
+父亲 component：
+BaseCard.vue
+
+```vue
+<template>
+  <section>
+    <slot></slot>
+  </section>
+</template>
+
+<script>
+export default {};
+</script>
+
+<style scoped>
+section {
+  margin: 2rem auto;
+  max-width: 30rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.26);
+  padding: 1rem;
+}
+</style>
+```
+
+孩子 component：
+UserInfo.vue
+
+```vue
+<template>
+  <base-card>
+    <div>
+      <h3>{{ fullName }}</h3>
+      <base-badge :type="role" :caption="role.toUpperCase()"></base-badge>
+    </div>
+    <p>{{ infoText }}</p>
+  </base-card>
+</template>
+
+<script>
+export default {
+  props: ['fullName', 'infoText', 'role'],
+};
+</script>
+```
+
+当我们构建起的 wrapper component 想令使用它的 components 不再仅仅拘泥于放置在一个位置，即 wrapper component 更复杂，更有结构化时，我们可以使用 v-slot 标签，即在父 component 中通过定义 slot name， 然后再在子 component 中使用 v-slot 指定对应的部分，来实现对应父 component 中不同区域的放置
+父 component：BaseCard.vue
+
+```vue
+<template>
+  <section>
+    <header>
+      <slot name="header"></slot>
+    </header>
+    <slot></slot>
+  </section>
+</template>
+```
+
+子 component：UserInfo.vue
+
+```vue
+<template>
+  <base-card>
+    <template v-slot:header>
+      <h3>{{ fullName }}</h3>
+      <base-badge :type="role" :caption="role.toUpperCase()"></base-badge>
+    </template>
+    <p>{{ infoText }}</p>
+  </base-card>
+</template>
+```
+
+当 template 作为 slot 传递给父组件的时候，传递过去的 template 并不会带着在该文件中的 scoped style，因此，必须事先把对应的 style 移动到父组件中才能令 style 生效
+子组件
+
+```vue
+<template>
+  <base-card>
+    <template v-slot:header>
+      <h3>{{ fullName }}</h3>
+      <base-badge :type="role" :caption="role.toUpperCase()"></base-badge>
+    </template>
+    <p>{{ infoText }}</p>
+  </base-card>
+</template>
+
+<script>
+export default {
+  props: ['fullName', 'infoText', 'role'],
+};
+</script>
+
+<style scoped>
+/* 因为以下style对应的template片段会被传递给父组件，而该style又是scoped，因此不会生效，必须移动到对应的父组件才可以 */
+section header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+</style>
+```
+
+如果在父组件的 slot 部分添加代码，则如果子组件在传递过程中，并没有对应的 slot 部分内容，则默认显示父组件中 slot 及其中的代码
+父组件
+
+```vue
+<template>
+  <section>
+    <header>
+      <slot name="header">
+        <h1>The Default</h1>
+      </slot>
+    </header>
+    <slot></slot>
+  </section>
+</template>
+```
+
+子组件
+
+```vue
+<template>
+  <base-card>
+    <p>{{ infoText }}</p>
+  </base-card>
+</template>
+```
+
+在上面这个例子中，即使子组件没有 header 部分，而父组件又定义了 header slot，则 html 一定会产生对应的 slot 节点，想避免这个问题，我们可以使用 v-if 在父组件中做优化，注意这种情况发生在父组件 slot 没有默认代码，而子组件又没有传递代码 template 过来
+父组件
+
+```vue
+<template>
+  <section>
+    <header v-if="$slots.header">
+      <slot name="header"></slot>
+    </header>
+    <slot></slot>
+  </section>
+</template>
+```
+
+shorthand: 子组件中的“v-slot：”一律可以用 “#”来代替
+
+```vue
+<template>
+  <base-card>
+    <template #header>
+      <h3>{{ fullName }}</h3>
+      <base-badge :type="role" :caption="role.toUpperCase()"></base-badge>
+    </template>
+    <p>{{ infoText }}</p>
+  </base-card>
+</template>
+```
+
+### scoped slot
+
+假如子组件 slot 部分想使用父组件中的 data，可以在父组件的 slot 定义里 bind 数据
+父组件
+
+```vue
+<template>
+  <ul>
+    <li v-for="goal in goals" :key="goal">
+      <slot :item="goal" another-props="..."></slot>
+    </li>
+  </ul>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      goals: ['Finish', 'Vue'],
+    };
+  },
+};
+</script>
+```
+
+子组件
+
+```vue
+<template>
+  <div>
+    <the-header></the-header>
+    <badge-list></badge-list>
+    <user-info
+      :full-name="activeUser.name"
+      :info-text="activeUser.description"
+      :role="activeUser.role"
+    ></user-info>
+    <course-goals>
+      <template #default="slotProps">
+        <h2>{{ slotProps.item }}</h2>
+        <p>{{ slotProps.anotherProps }}</p>
+      </template>
+    </course-goals>
+  </div>
+</template>
+```
+
+以上注意，子组件中关于 props 名称的自动转换；
+如果子组件中仅使用了一个 slot，可以将值传递的部分放置在父组件标签名内做到简写
+子组件
+
+```vue
+<course-goals #default="slotProps">
+  <h2>{{ slotProps.item }}</h2>
+  <p>{{ slotProps.anotherProps }}</p>
+</course-goals>
+```
+
+### Dynamic Components
+
+想要动态的切换两个组件显示，我们通常可以通过定义显示标签+v-if 来控制切换
+
+```vue
+<template>
+  <div>
+    <the-header></the-header>
+    <button @click="setSelectedComponent('active-goals')">Active Goals</button>
+    <button @click="setSelectedComponent('manage-goals')">Manage Goals</button>
+    <active-goals v-if="selectedComponent === 'active-goals'"></active-goals>
+    <manage-goals v-if="selectedComponent === 'manage-goals'"></manage-goals>
+  </div>
+</template>
+
+<script>
+import TheHeader from './components/TheHeader.vue';
+import ActiveGoals from './components/ActiveGoals.vue';
+import ManageGoals from './components/ManageGoals.vue';
+
+export default {
+  components: {
+    TheHeader,
+    ActiveGoals,
+    ManageGoals,
+  },
+  data() {
+    return {
+      selectedComponent: 'active-goals',
+      activeUser: {
+        name: 'Maximilian Schwarzmüller',
+        description: 'Site owner and admin',
+        role: 'admin',
+      },
+    };
+  },
+  methods: {
+    setSelectedComponent(cmp) {
+      this.selectedComponent = cmp;
+    },
+  },
+};
+</script>
+```
+
+但是这样多行的 v-if 对于代码的可扩展性并不好，对于这种情况，vue 开发了<component>标签，其中 is 的属性代表了对应显示的 component 名字，类似于 switch，因此上面的代码可以整理为
+
+```vue
+<template>
+  <div>
+    <the-header></the-header>
+    <button @click="setSelectedComponent('active-goals')">Active Goals</button>
+    <button @click="setSelectedComponent('manage-goals')">Manage Goals</button>
+    <keep-alive>
+      <component :is="selectedComponent"></component>
+    </keep-alive>
+  </div>
+</template>
+```
+
+#### keep-alive
+
+当我们通过 component 标签来切换组件的时候，被换的组件包括它的 state 都会消失，倘若我们在其中保存有任何的状态都会丢失，为防止这种情况，我们会使用 keep-alive 标签，这样切换过的 component 会保存在 cache 里而不会被销毁
+
+```vue
+<keep-alive>
+  <component :is="selectedComponent"> </component>
+</keep-alive>
+```
+
+vue 中可以使用 ref 来指定一个元素和它的名字，然后在 data 通过 refs 来找到这个元素
+
+```vue
+<template>
+  <h2>Manage Goals</h2>
+  <input type="text" ref="goal" />
+  <button @click="setGoal">Set Goal</button>
+  <error-alert v-if="!isValid">
+    <h2>Input Invalid</h2>
+    <button @click="setIsValid">OK</button>
+  </error-alert>
+</template>
+
+<script>
+import ErrorAlert from './ErrorAlert.vue';
+export default {
+  components: {
+    ErrorAlert,
+  },
+  data() {
+    return {
+      isValid: true,
+    };
+  },
+  methods: {
+    setGoal() {
+      const enteredGoal = this.$refs.goal.value;
+      if (enteredGoal === '') {
+        this.isValid = false;
+      }
+    },
+    setIsValid() {
+      this.isValid = !this.isValid;
+    },
+  },
+};
+</script>
+```
+
+#### teleport
+
+上面这个例子中，因为 error-alert 是个 dialog，语义上它的节点位置应该位于 body 中，而不是 manage-goals 这个组件的父节点下，因此，我们可以使用 <teleport to="body"> 来将该 component 挂载在我们指定的节点下，to 后面即是我们指定挂载的位置
+
+```vue
+<template>
+  <h2>Manage Goals</h2>
+  <input type="text" ref="goal" />
+  <button @click="setGoal">Set Goal</button>
+  <teleport to="body">
+    <error-alert v-if="!isValid">
+      <h2>Input Invalid</h2>
+      <button @click="setIsValid">OK</button>
+    </error-alert>
+  </teleport>
+</template>
+```
+
+Vue2 里每一个 template 下面必须有一个子节点，子节点里才能挂在各种兄弟节点，但是 Vue3 里取消了这个限制，也就是<template></template>中间可以不用加 root div 了
+
+### Vue Style Guide
+
+https://v2.vuejs.org/v2/style-guide/?redirect=true
+
+- base Component 应该命名为“BaseXxxx”，“AppXxxx”，“VXxxx”，例如“BaseButton.vue”
+- 对于每个页面只可使用一次的单例组件，命名应该以“The”开头，比如“TheHeader.vue”
+
+### File Structure
+
+- ui 下面放 base 组件
+- layout 下面放 theHeader 类
+- 各类 feature 组件可以放到以 feature 命名的文件夹下
