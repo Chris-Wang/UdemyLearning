@@ -1739,3 +1739,196 @@ export default {
 const resIndex = this.storedRes.findIndex((res) => res.id === id);
 this.storedRes.splice(resIndex, 1);
 ```
+
+## Section 11: Forms
+
+### v-model modifier
+
+- v-model 可以将类型自动转换，如果在 input 中，规定了其类型是 number，用 this.$refs.input.value 得到的值其实是一个 string 类型，因为默认用户输入的 value 都是 string，而如果尝试用 v-model，则它会进行进一步转化，将这个 value 根据类型转换为了 number
+
+```vue
+<input id="age" name="age" type="number" v-model="userAge" />
+```
+
+也可以通过在 model 后面加 modifier 的方式，强制将 value 的类型做转换，如
+
+```vue
+<input id="age" name="age" type="text" v-model.number="userAge" />
+```
+
+除了 number，还有两个 modifier，lazy：决定了 v-model 更新的频率，trim：自动去掉字符串开头结尾的空格
+
+- v-model，还可以绑定 select dropdown，其中 data 中对应的初始值即为 select 的默认选项
+
+```vue
+<select id="referrer" name="referrer" v-model="referrer">
+  <option value="google">Google</option>
+  <option value="wom">Word of mouth</option>
+  <option value="newspaper">Newspaper</option>
+</select>
+```
+
+- v-model, 可以绑定 checkbox 和 radio select，注意对于这两种，每一个选项都需要附带一个唯一的 value，以方便 v-model 做出识别
+
+```vue
+<div class="form-control">
+  <h2>What are you interested in?</h2>
+  <div>
+    <input
+      id="interest-news"
+      name="interest"
+      type="checkbox"
+      value="News"
+      v-model="interest"
+    />
+    <label for="interest-news">News</label>
+  </div>
+  <div>
+    <input
+      id="interest-nothing"
+      name="interest"
+      type="checkbox"
+      value="Nothing"
+      v-model="interest"
+    />
+    <label for="interest-nothing">Nothing</label>
+  </div>
+</div>
+<div class="form-control">
+  <h2>How do you learn?</h2>
+  <div>
+    <input
+      id="how-video"
+      name="how"
+      type="radio"
+      value="Video Courses"
+      v-model="how"
+    />
+    <label for="how-video">Video Courses</label>
+  </div>
+  <div>
+    <input
+      id="how-other"
+      name="how"
+      type="radio"
+      value="Other"
+      v-model="how"
+    />
+    <label for="how-other">Other</label>
+  </div>
+</div>
+
+  data() {
+    return {
+      interests: [],
+      how: '',
+    };
+  },
+```
+
+- v-model 绑定 checkbox 时，如果同一个 name 下，有好多选项（checkbox），则 v-model 绑定的是个 array；如果只有一个 name，则绑定的是一个数据
+
+```vue
+<div class="form-control">
+      <input
+        type="checkbox"
+        id="confirm-terms"
+        name="confirm-terms"
+        v-model="confirm"
+      />
+      <label for="confirm-terms">Agree to terms of use?</label>
+</div>
+```
+
+### input validation
+
+首先需要在 input 中，对 blur 事件进行绑定，即用户输入完毕的 input 检测对应方法，然后对在 blur 对应的方法中进行相应的数据变化，来影响对应的变化，比如输出提示信息，改变标题 css style 等
+
+```vue
+<div class="form-control" :class="{ invalid: userNameValidity === 'invalid' }">
+  <label for="user-name">Your Name</label>
+  <input
+    id="user-name"
+    name="user-name"
+    type="text"
+    v-model.trim="userName"
+    @blur="validateInput"
+  />
+  <p v-if="userNameValidity === 'invalid'">
+    Please enter a valid user name
+  </p>
+</div>
+
+<script>
+export default {
+  data() {
+    return {
+      userName: '',
+      userNameValidity: 'pending',
+    };
+  },
+  methods: {
+    validateInput() {
+      if (this.userName === '') {
+        this.userNameValidity = 'invalid';
+      } else {
+        this.userNameValidity = 'valid';
+      }
+    },
+  },
+};
+</script>
+```
+
+- form 中的 button 默认 type 是 submit，如果不想每一个 button 都点击触发提交事件，则需要更改其类型
+
+```vue
+<li><button type="button">Poor</button></li>
+```
+
+### v-model on custom component
+
+- emit 在子组件中可以放在方法里直接传递
+
+```js
+methods: {
+    activate(option) {
+      this.activeOption = option;
+      this.$emit('select-rating', option);
+    },
+  },
+```
+
+等效于在 template 中，但是提高了可读性
+
+```vue
+<li><button type="button" @click="$emit('select-rating', 'Poor')">Poor</button></li>
+```
+
+在子组件和父组件之间的数值传递，除了使用 emit 外，我们同样可以使用 v-model 一次达成，首先我们需要在子组件中定义 props 跟 emits，然后再在父组件中做 v-model 绑定即可
+子组件
+
+```vue
+<template>
+  <li :class="{ active: modelValue === 'Average' }">
+    <button type="button" @click="activate('Average')">Average</button>
+  </li>
+</template>
+<script>
+export default {
+  props: ['modelValue'],
+  emits: ['update:modelValue'],
+  methods: {
+    activate(option) {
+      this.$emit('update:modelValue', option);
+    },
+  },
+};
+</script>
+```
+
+父组件
+
+```vue
+<rating-control v-model="userRating"></rating-control>
+```
