@@ -1932,3 +1932,94 @@ export default {
 ```vue
 <rating-control v-model="userRating"></rating-control>
 ```
+
+## Section 20: Reusing Functionality: Mixins & Custom Composition Functions
+
+使用 options api 的 mixin，可以让你在组件件 share data，methods，property, lifecycle hooks
+
+除了 component，script 中的其它部分都可以抽象为一个 mixin，然后再次在其它 component 中引用，这样所有在 mixin 中的东西都可以变为共享
+mixin
+
+```js
+export default {
+  data() {
+    return {
+      alertIsVisible: false,
+    };
+  },
+  methods: {
+    showAlert() {
+      this.alertIsVisible = true;
+    },
+    hideAlert() {
+      this.alertIsVisible = false;
+    },
+  },
+};
+```
+
+component
+
+```vue
+<template>
+  <user-alert v-if="alertIsVisible" title="Add a User?" @close="hideAlert">
+    <p>Do you want to continue with adding a user?</p>
+  </user-alert>
+  <section>
+    <h2>Add a User</h2>
+    <button @click="showAlert">Add User</button>
+  </section>
+</template>
+
+<script>
+import UserAlert from './UserAlert.vue';
+import alertMixin from './../mixins/alert.js';
+
+export default {
+  components: {
+    UserAlert,
+  },
+  mixins: [alertMixin],
+};
+</script>
+```
+
+### mixin merging
+
+component 和 mixin 中都可以定义 data，这时候，组件内实际的 data 是两者 merge 的，如果 component 和 mixin 中均定义了相同 data，则 component 中的 data 会覆盖掉 mixin 中的
+
+如果 component 和 mixin 中均定义了相同的 hooks，比如 mounted，则 mixin 中的先执行，component 中的后执行
+
+### Global mixin
+
+可以通过在 main.js 中注册 mixin，则该 mixin 会被自动加载进所有组件
+logger.js
+
+```js
+export default {
+  data() {
+    return {
+      logIn: 'Mixins are awesome!',
+    };
+  },
+  mounted() {
+    console.log('mixin mounted.');
+  },
+};
+```
+
+main.js
+
+```js
+import { createApp } from 'vue';
+import App from './App.vue';
+import loggerMixing from './mixins/logger.js';
+
+const app = createApp(App);
+
+app.mixin(loggerMixing);
+
+app.mount('#app');
+```
+
+mixin 会产生一个问题，因为部分 logic 在不同的 mixin 中做了封装，在我们的 component 调用中，如果引入多个 mixin 就会变得难以维护，比如不知道某个方法来自哪个 mixin，或者我们 overwrite 了某个方法
