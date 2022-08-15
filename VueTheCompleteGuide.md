@@ -2023,3 +2023,80 @@ app.mount('#app');
 ```
 
 mixin 会产生一个问题，因为部分 logic 在不同的 mixin 中做了封装，在我们的 component 调用中，如果引入多个 mixin 就会变得难以维护，比如不知道某个方法来自哪个 mixin，或者我们 overwrite 了某个方法
+
+## Section 12: Sending Http Requests
+
+- firebase 的 request 最后一定要加.json，比如
+
+```js
+fetch('https://vue-http-demo-default-rtdb.firebasedatabase.app/surveys.json');
+```
+
+- 'Content-Type': 'application/json' 意味着该请求发送的内容格式为 json
+- 使用 fetch 的方法，发送 post 请求
+
+```js
+fetch(
+  'https://vue-http-demo-17142-default-rtdb.asia-southeast1.firebasedatabase.app/surveys.json',
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: this.enteredName,
+      rating: this.chosenRating,
+    }),
+  }
+);
+```
+
+- 使用 axios 的方法，发送 post 请求，他会自动 set content-type，以及自动将 body 转换为 Json
+
+```js
+import axios from 'axios';
+axios.post(
+  'https://vue-http-demo-17142-default-rtdb.asia-southeast1.firebasedatabase.app/surveys.json',
+  {
+    name: this.enteredName,
+    rating: this.chosenRating,
+  }
+);
+```
+
+- fetch 发送 get 请求
+
+```js
+fetch('https://vue-http-demo.app/surveys.json')
+  .then((response) => {
+    if (response.ok) {
+      return response.json();
+    }
+  })
+  .then((data) => {
+    this.results = response.data;
+    console.log(data);
+  });
+```
+
+- axios 发送 get 请求
+
+```js
+axios
+  .get('https://vue-http-demo.app/surveys.json')
+  .then((response) => {
+    this.results = response.data;
+    console.log(this.results);
+  })
+  .catch((error) => {
+    console.log(error);
+  });
+```
+
+- 一般会把加载数据放在 mount 里
+
+```js
+mounted() {
+    this.loadResults();
+  },
+```
