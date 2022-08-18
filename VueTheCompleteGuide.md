@@ -2100,3 +2100,700 @@ mounted() {
     this.loadResults();
   },
 ```
+
+## Section 13: Routing: Building "Multi-Page" Single Page Applications
+
+npm install --save vue-router
+
+### config vue-route
+
+- step 1: import
+- step 2: 使用 createRouter 方法，传递 path 和 component，以及 history
+  - history：设置如何管理 routing history，一般采用默认的 createWebHistory()，及正常管理记录用户的 url 历史
+  - routes：告诉 vue 我们要添加哪些 url，以及分别对应哪些 component
+- step 3: 使用 app.use 装载 router
+- step 4: 在 App 中使用 <router-view>来挂载，所有的在 router 中注册的 component 现在都变成了 global component
+  main.js
+
+```js
+import { createApp } from 'vue';
+import { createRouter, createWebHistory } from 'vue-router';
+import App from './App.vue';
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: '/teams',
+      component: () => import('./components/teams/TeamsList.vue'),
+    },
+    {
+      path: '/users',
+      component: () => import('./components/users/UsersList.vue'),
+    },
+  ],
+});
+
+const app = createApp(App);
+app.use(router);
+app.mount('#app');
+```
+
+App.vue
+
+```vue
+<template>
+  <the-navigation @set-page="setActivePage"></the-navigation>
+  <main>
+    <router-view></router-view>
+  </main>
+</template>
+```
+
+### router-link
+
+router-link 类似于<a>，也会被渲染成<a>，但是他不会重置页面的 state，仅需要填写指向的 path，就可完成
+
+```vue
+<li>
+  <router-link to="/teams">Teams</router-link>
+</li>
+```
+
+router-link 中，所在对应 url 时候，会自动多出 router-link-active 和 router-link-exact-active class,因此通过定义这两个 class，我们可以为当前所在的 router-link 添加样式；他们的区别在于，exact-active 要求 navigation item 与当前路径完全匹配，而-active 则是指要求 navigation item 只包含部分当前路径就好
+
+```css
+a.router-link-active {
+  color: #f1a80a;
+  border-color: #f1a80a;
+  background-color: #1a037e;
+}
+```
+
+如果对默认的 router-link-active 和 router-link-exact-active 两个 class 名不满意，可以在 main 的配置里修改
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: '/teams',
+      component: () => import('./components/teams/TeamsList.vue'),
+    },
+    {
+      path: '/users',
+      component: () => import('./components/users/UsersList.vue'),
+    },
+  ],
+  linkActiveClass: 'is-active',
+});
+```
+
+## Section 15: Vuex
+
+local state: 仅在某一个 component 内可以使用的 data
+global state： 多个或者所有 component 都可以使用的 data
+
+理论上我们可以依然使用 provide 来实现 global state，但是他有如下问题
+
+- provide 提供的 state，需要在改 component 里（比如 App.vue）定义对应修改方法，而这个方法本身可能只是供其他 component 使用的，会造成 provide 所在的 component 变成 fat component
+- data 可能在预期之外发生改变
+- 因为忘记更新 state，可能会造成 data 错误
+
+npm install --save vuex
+
+### config vuex
+
+- step 1: import vuex
+- step 2: 使用 createStore 方法，配置 state
+  - state 的配置写法像极了 component 里的 data
+- step 3: 使用 app.use 装载 store
+- step 4: 在 子 component 中通过$store.state 来使用
+  main.js
+
+```js
+import { createApp } from 'vue';
+import { createStore } from 'vuex';
+import App from './App.vue';
+
+const store = createStore({
+  state() {
+    return {
+      counter: 0,
+    };
+  },
+});
+
+const app = createApp(App);
+
+app.use(store);
+app.mount('#app');
+```
+
+App.vue
+
+```js
+<h3>{{ $store.state.counter }}</h3>
+
+methods: {
+    addOne() {
+      this.$store.state.counter++;
+    },
+  }
+```
+
+### mutation
+
+为了对 state 的管理更加统一，对 state 更改的方法可以在 createStore 时使用 mutation 注册，这样在其他 component 里就可以直接通过 commit 调用该方法
+main.js
+
+```vue
+const store = createStore({ state() { return { counter: 0, }; }, mutations: {
+increment(state) { state.counter++; }, }, });
+```
+
+子组件
+
+```vue
+<script>
+export default {
+  methods: {
+    addOne() {
+      this.$store.commit('increment');
+    },
+  },
+};
+</script>
+```
+
+mutation method 可以添加 payload，以供组件调用时传入参数
+main
+
+```js
+mutations: {
+  increase(state, payload) {
+    state.counter += payload.value;
+  },
+},
+```
+
+子组件
+
+```js
+addOne() {
+  this.$store.commit('increase', { value: 10 })
+  this.$store.commit({
+    type: 'increase',
+    value: 10,
+  });
+},
+```
+
+mutations 中的方法必须是同步的，而不能是异步的，因为 state 可能会在其它地方调用，如果异步可能会造成阻塞
+
+### getters
+
+为了保证 component 对 state 中的数据做更统一的访问，我们还可以定义 getters，类似于 computed
+main
+
+```js
+const store = createStore({
+  state() {
+    return {
+      counter: 0,
+    };
+  },
+  getters: {
+    finalCounter(state) {
+      return state.counter * 2;
+    },
+  },
+});
+```
+
+子组件
+
+```vue
+<template>
+  <h3>{{ counter }}</h3>
+</template>
+
+<script>
+export default {
+  computed: {
+    counter() {
+      return this.$store.getters.finalCounter;
+    },
+  },
+};
+</script>
+```
+
+getters 中的方法，可以互相调用
+
+```js
+getters: {
+  finalCounter(state) {
+    return state.counter * 2;
+  },
+  normalizedCounter(state, getters) {
+    const finalCounter = getters.finalCounter;
+    if (finalCounter > 100) return 100;
+    return finalCounter;
+  },
+},
+```
+
+对没有使用又必要的参数，可以用\_替换，比如上面的可以写为
+
+```js
+getters: {
+  finalCounter(state) {
+    return state.counter * 2;
+  },
+  normalizedCounter(_, getters) {
+    const finalCounter = getters.finalCounter;
+    if (finalCounter > 100) return 100;
+    return finalCounter;
+  },
+},
+```
+
+### Actions
+
+为了使 state 的数据可以异步更新，可以使用 action
+main
+
+```js
+const store = createStore({
+  state() {
+    return {
+      counter: 0,
+    };
+  },
+  mutations: {
+    increment(state) {
+      state.counter++;
+    },
+    increase(state, payload) {
+      state.counter += payload.value;
+    },
+  },
+  actions: {
+    increment(context) {
+      setTimeout(function () {
+        context.commit('increment');
+      }, 2000);
+    },
+
+    increase(context, payload) {
+      setTimeout(function () {
+        context.commit('increase', payload);
+      }, 2000);
+    },
+  },
+});
+```
+
+子组件
+
+```vue
+<script>
+export default {
+  methods: {
+    addOne() {
+      this.$store.dispatch('increment');
+      this.$store.dispatch({
+        type: 'increase',
+        value: 10,
+      });
+    },
+  },
+};
+</script>
+```
+
+actions 中的 context 非常强大，可以使用 context.getter, context.dispatch，所以我们是可以在 actions 的方法中相互 dispatch，也可以使用 getters 拿到数据
+
+actions 中不要直接操作 state，而应该是通过 mutation 来达到这个目的
+
+### MapGetter
+
+想减少直接对 store 的访问，我们可以通过 mapGetter 的方法，直接把 getters 中的方法搬过来，其中 mapGetter 中的 Array 参数，即为我们想拿来使用的 getters 方法
+main
+
+```js
+getters: {
+  finalCounter(state) {
+    return state.counter * 2;
+  },
+  normalizedCounter(_, getters) {
+    const finalCounter = getters.finalCounter;
+    if (finalCounter > 100) return 100;
+    return finalCounter;
+  },
+},
+```
+
+子组件
+
+```vue
+<template>
+  <h3>{{ finalCounter }}</h3>
+</template>
+
+<script>
+import { mapGetters } from 'vuex';
+
+export default {
+  computed: {
+    // counter() {
+    //   return this.$store.getters.finalCounter;
+    // },
+    ...mapGetters(['finalCounter']),
+  },
+};
+</script>
+```
+
+mapGetters 还可以为导入的方法自定义名称
+
+```js
+...mapGetters({
+      fc:'finalCounter',
+    }),
+```
+
+### MapActions
+
+类似于其它 Map Helpers，mapActions 也是可以帮忙直接拿到 actions 里面的方法,具体用法如下
+子组件
+
+```vue
+<template>
+  <button @click="increase({ value: 10 })">Add 10</button>
+</template>
+
+<script>
+import { mapActions } from 'vuex';
+
+export default {
+  methods: {
+    // addOne() {
+    //   this.$store.dispatch({
+    //     type: 'increase',
+    //     value: 10,
+    //   });
+    // },
+    ...mapActions(['increase']),
+  },
+};
+</script>
+```
+
+mapActions 还可以为导入的方法自定义名称
+
+```js
+...mapActions({
+      inc:'increment',
+    }),
+```
+
+### Modules
+
+可以将 store 中的内容拆分管理，然后再次以 modules 的形式导入
+
+```js
+const counterModule = {
+  state() {
+    return {
+      counter: 0,
+    };
+  },
+  mutations: {
+    increment(state) {
+      state.counter = state.counter + 2;
+    },
+    increase(state, payload) {
+      state.counter = state.counter + payload.value;
+    },
+  },
+  actions: {
+    increment(context) {
+      setTimeout(function () {
+        context.commit('increment');
+      }, 2000);
+    },
+    increase(context, payload) {
+      console.log(context);
+      context.commit('increase', payload);
+    },
+  },
+  getters: {
+    finalCounter(state) {
+      return state.counter * 3;
+    },
+    normalizedCounter(_, getters) {
+      const finalCounter = getters.finalCounter;
+      if (finalCounter < 0) {
+        return 0;
+      }
+      if (finalCounter > 100) {
+        return 100;
+      }
+      return finalCounter;
+    },
+  },
+};
+
+const store = createStore({
+  modules: {
+    numbers: counterModule,
+  },
+});
+```
+
+module 中的 state 是 local 的，同理的，该 module 内的 mutation，action，getter 方法仅能访问该 module 内的 state 值，无法调用外部的值
+但是 getter 可以尝试引入 rootState, rootGetters 的参数，来导入外部的 state
+
+为了更好的管理 module，比如防止 global 里的 mutation 方法与 module 里的 mutation 方法重名，我们可以引入 namespaced，这样任何子组件对 module 中的访问都必须加入 module name
+main
+
+```js
+const counterModule = {
+  namespaced: true,
+  state() {
+    return {
+      counter: 0,
+    };
+  },
+  ...
+}
+const store = createStore({
+  modules: {
+    numbers: counterModule,
+  },
+  ...
+}
+```
+
+子组件
+
+```vue
+<script>
+export default {
+  computed: {
+    counter() {
+      return this.$store.getters['numbers/normalizedCounter'];
+    },
+  },
+};
+</script>
+```
+
+```vue
+<script>
+import { mapGetters } from 'vuex';
+
+export default {
+  methods: {
+    addOne() {
+      this.$store.dispatch({
+        type: 'numbers/increase',
+        value: 10,
+      });
+    },
+  },
+  computed: {
+    ...mapGetters('numbers', ['numbers/finalCounter']),
+  },
+};
+</script>
+```
+
+### restrcutre vuex files
+
+在复杂的项目中，为了更好的管理 vuex 文件，我们可以生成 module 文件夹，然后将原来的 store 文件做更好的拆分
+原文件
+
+```js
+import { createStore } from 'vuex';
+
+const store = createStore({
+  modules: {
+    numbers: counterModule,
+  },
+  state() {
+    return {
+      isLoggedIn: false,
+    };
+  },
+  mutations: {
+    setAuth(state, payload) {
+      state.isLoggedIn = payload.isAuth;
+    },
+  },
+  actions: {
+    login(context) {
+      context.commit('setAuth', { isAuth: true });
+    },
+    logout(context) {
+      context.commit('setAuth', { isAuth: false });
+    },
+  },
+  getters: {
+    userIsAuthenticated(state) {
+      return state.isLoggedIn;
+    },
+  },
+});
+
+export default store;
+```
+
+拆分后的文件
+store/
+index.js
+
+```
+import { createStore } from 'vuex';
+
+import rootMutations from './mutations.js';
+import rootActions from './actions.js';
+import rootGetters from './getters.js';
+import counterModule from './modules/counter';
+
+const store = createStore({
+  modules: {
+    numbers: counterModule,
+  },
+  state() {
+    return {
+      isLoggedIn: false,
+    };
+  },
+  mutations: rootMutations,
+  actions: rootActions,
+  getters: rootGetters,
+});
+
+export default store;
+```
+
+mutations.js
+
+```js
+export default {
+  setAuth(state, payload) {
+    state.isLoggedIn = payload.isAuth;
+  },
+};
+```
+
+getters.js
+
+```
+export default {
+  userIsAuthenticated(state) {
+    return state.isLoggedIn;
+  },
+};
+```
+
+actions.js
+
+```
+export default {
+  login(context) {
+    context.commit('setAuth', { isAuth: true });
+  },
+  logout(context) {
+    context.commit('setAuth', { isAuth: false });
+  },
+};
+```
+
+modules/counter
+index.js
+
+```js
+import counterMutations from './mutations.js';
+import counterActions from './actions.js';
+import counterGetters from './getters.js';
+
+export default {
+  state() {
+    return {
+      counter: 0,
+    };
+  },
+  mutations: counterMutations,
+  actions: counterActions,
+  getters: counterGetters,
+};
+```
+
+mutations.js
+
+```js
+export default {
+  increment(state) {
+    state.counter = state.counter + 2;
+  },
+  increase(state, payload) {
+    state.counter = state.counter + payload.value;
+  },
+};
+```
+
+getters.js
+
+```js
+export default {
+  finalCounter(state) {
+    return state.counter * 3;
+  },
+  normalizedCounter(_, getters) {
+    const finalCounter = getters.finalCounter;
+    if (finalCounter < 0) {
+      return 0;
+    }
+    if (finalCounter > 100) {
+      return 100;
+    }
+    return finalCounter;
+  },
+};
+```
+
+actions.js
+
+```js
+export default {
+  increment(context) {
+    setTimeout(function () {
+      context.commit('increment');
+    }, 2000);
+  },
+  increase(context, payload) {
+    console.log(context);
+    context.commit('increase', payload);
+  },
+};
+```
+
+main.js
+
+```js
+import { createApp } from 'vue';
+
+import App from './App.vue';
+import store from './store';
+
+const app = createApp(App);
+
+app.use(store);
+app.config.devtools = true;
+
+app.mount('#app');
+```
