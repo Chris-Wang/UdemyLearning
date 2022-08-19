@@ -2107,7 +2107,7 @@ npm install --save vue-router
 
 ### config vue-route
 
-- step 1: import
+- step 1: import { createRouter, createWebHistory } from 'vue-router'
 - step 2: 使用 createRouter 方法，传递 path 和 component，以及 history
   - history：设置如何管理 routing history，一般采用默认的 createWebHistory()，及正常管理记录用户的 url 历史
   - routes：告诉 vue 我们要添加哪些 url，以及分别对应哪些 component
@@ -2187,6 +2187,836 @@ const router = createRouter({
   ],
   linkActiveClass: 'is-active',
 });
+```
+
+### Navigation
+
+在功能代码中，可以使用$router.push，将页面导向其它地址，并记录在history中，其它还有$router.back(后退), $router.forward（前进）
+
+```js
+methods: {
+  confirm() {
+    this.$router.push('/teams');
+  },
+},
+```
+
+### passing data
+
+this.$route.path ：获取当前路径
+this.$route.params：获取当前路径参数，即：后面的内容
+
+可以将 params 拿到的参数放在 created，来更新数据
+
+```vue
+<template>
+  <section>
+    <h2>{{ teamName }}</h2>
+    <ul>
+      <user-item
+        v-for="member in members"
+        :key="member.id"
+        :name="member.fullName"
+        :role="member.role"
+      ></user-item>
+    </ul>
+  </section>
+</template>
+
+<script>
+import UserItem from '../users/UserItem.vue';
+
+export default {
+  inject: ['users', 'teams'],
+  components: {
+    UserItem,
+  },
+  data() {
+    return {
+      teamName: '',
+      members: [],
+    };
+  },
+  created() {
+    const teamId = this.$route.params.teamId;
+    const selectedTeam = this.teams.find((team) => team.id === teamId);
+    const members = selectedTeam.members;
+    this.members = this.users.filter((user) => members.includes(user.id));
+    this.teamName = selectedTeam.name;
+  },
+};
+</script>
+```
+
+<router-link>可以代替<a>实现动态 url
+例如
+
+```vue
+<template>
+  <li>
+    <h3>{{ name }}</h3>
+    <div class="team-members">{{ memberCount }} Members</div>
+    <router-link :to="'/teams/' + id">View Members</router-link>
+  </li>
+</template>
+
+<script>
+export default {
+  props: ['id', 'name', 'memberCount'],
+};
+</script>
+```
+
+为了让上面更好看，可以使用 computed
+
+```vue
+<template>
+  <li>
+    <h3>{{ name }}</h3>
+    <div class="team-members">{{ memberCount }} Members</div>
+    <router-link :to="teamMembersLink">View Members</router-link>
+  </li>
+</template>
+
+<script>
+export default {
+  props: ['id', 'name', 'memberCount'],
+  computed: {
+    teamMembersLink() {
+      return '/teams/' + this.id;
+    },
+  },
+};
+</script>
+```
+
+在这里，可以通过返回 object 的方式来替换返回 string
+
+```vue
+<script>
+export default {
+  props: ['id', 'name', 'memberCount'],
+  computed: {
+    teamMembersLink() {
+      return { path: '/teams/' + this.id };
+    },
+  },
+};
+</script>
+```
+
+即使我们通过 router-link 来更新 url，页面的 component 可能也不会变，但是 component 里的 this.$route 会改变，因此我们可以将 route 加入 watch，来动态通知页面更新
+
+```vue
+<template>
+  <section>
+    <h2>{{ teamName }}</h2>
+    <ul>
+      <user-item
+        v-for="member in members"
+        :key="member.id"
+        :name="member.fullName"
+        :role="member.role"
+      ></user-item>
+    </ul>
+  </section>
+</template>
+
+<script>
+import UserItem from '../users/UserItem.vue';
+
+export default {
+  inject: ['users', 'teams'],
+  components: {
+    UserItem,
+  },
+  data() {
+    return {
+      teamName: '',
+      members: [],
+    };
+  },
+  methods: {
+    loadTeamMembers(route) {
+      const teamId = route.params.teamId;
+      const selectedTeam = this.teams.find((team) => team.id === teamId);
+      if (!selectedTeam) return;
+      const members = selectedTeam.members;
+      this.members = this.users.filter((user) => members.includes(user.id));
+      this.teamName = selectedTeam.name;
+    },
+  },
+  created() {
+    this.loadTeamMembers(this.$route);
+  },
+  watch: {
+    $route(newRoute) {
+      this.loadTeamMembers(newRoute);
+    },
+  },
+};
+</script>
+```
+
+如果想杜绝对 route 的依赖，因为通过$route 的方式来更新组件，会大大降低组件的可复用性，我们可以将 id 以 props 的形式传进来
+main.js
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: '/teams/:teamId',
+      component: () => import('./components/teams/TeamMembers.vue'),
+      props: true,
+    },
+  ],
+});
+```
+
+TeamMembers.vue
+
+```vue
+<template>
+  <section>
+    <h2>{{ teamName }}</h2>
+    <ul>
+      <user-item
+        v-for="member in members"
+        :key="member.id"
+        :name="member.fullName"
+        :role="member.role"
+      ></user-item>
+    </ul>
+  </section>
+</template>
+
+<script>
+import UserItem from '../users/UserItem.vue';
+
+export default {
+  inject: ['users', 'teams'],
+  props: ['teamId'],
+  components: {
+    UserItem,
+  },
+  data() {
+    return {
+      teamName: '',
+      members: [],
+    };
+  },
+  methods: {
+    loadTeamMembers(teamId) {
+      const selectedTeam = this.teams.find((team) => team.id === teamId);
+      if (!selectedTeam) return;
+      console.log(selectedTeam);
+      const members = selectedTeam.members;
+      this.members = this.users.filter((user) => members.includes(user.id));
+      this.teamName = selectedTeam.name;
+    },
+  },
+  created() {
+    this.loadTeamMembers(this.teamId);
+  },
+  watch: {
+    teamId(newId) {
+      this.loadTeamMembers(newId);
+    },
+  },
+};
+</script>
+```
+
+### redirect
+
+route 的配置中可以加入 redirect，以重定向一个 url
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', redirect: '/teams' },
+    {
+      path: '/teams',
+      component: () => import('./components/teams/TeamsList.vue'),
+    },
+    {
+      path: '/users',
+      component: () => import('./components/users/UsersList.vue'),
+    },
+  ],
+});
+```
+
+或者通过 alias 也能达到此效果
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: '/teams',
+      component: () => import('./components/teams/TeamsList.vue'),
+      alias: '/',
+    },
+  ],
+});
+```
+
+不同的地方是，redirect 会改变 path，而 alias 不会
+
+想匹配哪些没有对应的路径，可以在 routes 的最后一项里插入
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', redirect: '/teams' },
+    {
+      path: '/teams',
+      component: () => import('./components/teams/TeamsList.vue'),
+    },
+    {
+      path: '/users',
+      component: () => import('./components/users/UsersList.vue'),
+    },
+    {
+      path: '/teams/:teamId',
+      component: () => import('./components/teams/TeamMembers.vue'),
+      props: true,
+    },
+    { path: '/:notFound(.*)', redirect: '/teams' },
+  ],
+});
+```
+
+/:notFound(.\*) 意为所有/之后的任何 path，都会被引导到这里，所以这个一般也会放在最后一项，不然会 overwrite 其它所有的 routes
+
+### nested routes
+
+为了使 routes 的格式更清晰，我们可以将部分的 route 从 root 里取出，再作为 children route 放入，比如
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', redirect: '/teams' },
+    {
+      path: '/teams',
+      component: () => import('./components/teams/TeamsList.vue'),
+      children: [
+        {
+          path: ':teamId',
+          component: () => import('./components/teams/TeamMembers.vue'),
+          props: true,
+        },
+      ],
+    },
+    {
+      path: '/users',
+      component: () => import('./components/users/UsersList.vue'),
+    },
+    { path: '/:notFound(.*)', redirect: '/teams' },
+  ],
+});
+```
+
+需要注意的是，这样做以后，需要在对应的组件下再添加 router-view，因为一般情况下 router-view 服务于 rootroutes
+TeamsList.vue
+
+```vue
+<template>
+  <router-view></router-view>
+  <ul>
+    <teams-item
+      v-for="team in teams"
+      :key="team.id"
+      :id="team.id"
+      :name="team.name"
+      :member-count="team.members.length"
+    ></teams-item>
+  </ul>
+</template>
+```
+
+当 child route 被 active 的时候，对应的 parent route 也将变为 active 状态
+
+### named routes
+
+我们可以为每一个 route 命名，这样在组件内 to 的时候，就可以通过 name，来调取该组件，这样在更改 route 的 path 以后，我们就不需要更新每个使用该 route 的 path 了
+main.js
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', redirect: '/teams' },
+    {
+      name: 'teams',
+      path: '/teams',
+      component: () => import('./components/teams/TeamsList.vue'),
+      children: [
+        {
+          name: 'team-members',
+          path: ':teamId',
+          component: () => import('./components/teams/TeamMembers.vue'),
+          props: true,
+        },
+      ],
+    },
+    {
+      path: '/users',
+      component: () => import('./components/users/UsersList.vue'),
+    },
+    { path: '/:notFound(.*)', redirect: '/teams' },
+  ],
+});
+```
+
+子组件
+
+```vue
+<template>
+  <li>
+    <h3>{{ name }}</h3>
+    <div class="team-members">{{ memberCount }} Members</div>
+    <router-link :to="teamMembersLink">View Members</router-link>
+  </li>
+</template>
+
+<script>
+export default {
+  props: ['id', 'name', 'memberCount'],
+  computed: {
+    teamMembersLink() {
+      // return '/teams/' + this.id;
+      // return { path: '/teams/' + this.id };
+      return { name: 'team-members', params: { teamId: this.id } };
+    },
+  },
+};
+</script>
+```
+
+同样 push 也可以使用 name
+
+```js
+this.$router.push({ name: 'team-members', params: { teamId: this.id } });
+```
+
+### query params
+
+我们不需要在配置 route 的时候配置 query params，只需要在组件使用它的时候，以下面的形式传入就好
+
+```js
+return { path: '/teams/' + this.id + '?sort=asc' };
+```
+
+或者
+
+```js
+return {
+  name: 'team-members',
+  params: { teamId: this.id },
+  query: { sort: 'asc' },
+};
+```
+
+想解析 query params，我们也只需要使用 this.$route.query.
+
+### multiple routes and named router-view
+
+假如我们想根据 path 的不同，来决定页面上细节部位的变化，比如 footer，在 team 和 user 的不同 path 下，内容也不同，我们可以使用 named router-view 来以类似 slot 的方式完成这个需求
+首先，我们在配置 route 时引入不同的 component，并给以 name
+main.js
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', redirect: '/teams' },
+    {
+      name: 'teams',
+      path: '/teams',
+      components: {
+        default: () => import('./components/teams/TeamsList.vue'),
+        footer: () => import('./components/teams/TeamFooter.vue'),
+      },
+      children: [
+        {
+          name: 'team-members',
+          path: ':teamId',
+          component: () => import('./components/teams/TeamMembers.vue'),
+          props: true,
+        },
+      ],
+    },
+  ],
+});
+```
+
+然后我们在 component 里的 router-view 加上命名
+
+```vue
+<template>
+  <the-navigation></the-navigation>
+  <main>
+    <router-view></router-view>
+  </main>
+  <footer>
+    <router-view name="footer"></router-view>
+  </footer>
+</template>
+```
+
+### scroll behavior
+
+scrollBehavior 方法应该返回一个在页面跳转后，页面所在的位置，而其中的 savedPosition 则记录了在跳转前所在的屏幕位置
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', redirect: '/teams' },
+    ...
+  ],
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition;
+    }
+    return { left: 0, top: 0 };
+  },
+});
+```
+
+因为用不到 to，from，因此还可以写成
+
+```js
+ scrollBehavior(_, _2, savedPosition) {
+    if (savedPosition) {
+      return savedPosition;
+    }
+    return { left: 0, top: 0 };
+  },
+```
+
+### navigation guard
+
+beforeEach
+
+- 该方法在每次页面跳转前执行，其中有三个参数，to，from，next，to 和 from 可以拿到$route 的等效信息，使用 next()表示允许进入下个页面，next(false)则表示不允许，next 内还可以传递要转入的页面地址，比如
+
+```js
+import App from './App.vue';
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+  ...
+});
+
+router.beforeEach(function (to, from, next) {
+  next();
+});
+
+const app = createApp(App);
+```
+
+```js
+next('/teams');
+next({ name: 'team-members', param: { teamId: 't2' } });
+```
+
+### beforeEnter
+
+- 该方法还可以插入在 children route 里，表示在导入这个页面前，会运行的 function
+
+```js
+ routes: [
+    { path: '/', redirect: '/teams' },
+    {
+      path: '/users',
+      component: () => import('./components/users/UsersList.vue'),
+      beforeEnter(to, from, next) {},
+    },
+  ],
+```
+
+### beforeRouteEnter
+
+- 相对应的，子组件里也可以插入类似的方法，用法相同
+
+```vue
+<script>
+import UserItem from './UserItem.vue';
+
+export default {
+  components: {
+    UserItem,
+  },
+  inject: ['users'],
+  methods: {
+    confirm() {
+      this.$router.push('/teams');
+    },
+  },
+  beforeRouteEnter(to, from, next) {
+    next();
+  },
+};
+</script>
+```
+
+以上三处的 navigation guard 的顺序为: global beforeEach -> childe route beforeEnter -> component beforeRouterEnter
+
+- beforeRouteUpdate
+  在组件中使用，切仅在路径有变更，而该组件又被复用时使用，例如下面，id 基于路径，因此可以替代 watch
+
+```vue
+<script>
+import UserItem from '../users/UserItem.vue';
+
+export default {
+  inject: ['users', 'teams'],
+  props: ['teamId'],
+  components: {
+    UserItem,
+  },
+  data() {
+    return {
+      teamName: '',
+      members: [],
+    };
+  },
+  methods: {
+    loadTeamMembers(teamId) {
+      const selectedTeam = this.teams.find((team) => team.id === teamId);
+      if (!selectedTeam) return;
+      console.log(selectedTeam);
+      const members = selectedTeam.members;
+      this.members = this.users.filter((user) => members.includes(user.id));
+      this.teamName = selectedTeam.name;
+    },
+  },
+  created() {
+    this.loadTeamMembers(this.teamId);
+  },
+  beforeRouteUpdate(to, from, next) {
+    this.loadTeamMembers(to.params.teamId);
+    next();
+  },
+  // watch: {
+  //   teamId(newId) {
+  //     this.loadTeamMembers(newId);
+  //   },
+  // },
+};
+</script>
+```
+
+- afterEach
+  在 main 里使用，在每次导航完成后执行，无法改变导航，一般用于在页面导航完成后，执行某些功能，例如发送统计信息
+
+```js
+router.beforeEach(function (to, from, next) {
+  next();
+});
+
+router.afterEach(function (to, from) {
+  // sending analytics data
+});
+
+const app = createApp(App);
+```
+
+- beforeRouteLeave
+  在 component 内使用，在即将离开该地址（页面）之前，执行的方法，类似于 component unmounted，可以取消地址的导航，优先度高于 beforeEach 和 beforeRouteEnter
+  一般用于帮助用户确保输入的 form 信息等有保存
+
+```vue
+<script>
+export default {
+  components: {
+    UserItem,
+  },
+  methods: {
+    ...
+  },
+  beforeRouteEnter(to, from, next) {
+    next();
+  },
+  beforeRouteLeave(to, from, next) {
+    if (this.changesSaved) {
+      next();
+    } else {
+      const userWantsToLeave = confirm('Are you sure you want to leave?');
+      next(userWantsToLeave);
+    }
+  },
+};
+</script>
+```
+
+- Route Metadata
+  在配置 route 时使用，一旦放入 meta，等于可以在 to，from，$route 中通过.meta 拿到该值，例如
+  main.js
+
+```js
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', redirect: '/teams' },
+    {
+      name: 'teams',
+      path: '/teams',
+      meta:{needsAuth:true},
+      components: {
+        default: () => import('./components/teams/TeamsList.vue'),
+        footer: () => import('./components/teams/TeamFooter.vue'),
+      },
+      children: [
+        {
+          name: 'team-members',
+          path: ':teamId',
+          component: () => import('./components/teams/TeamMembers.vue'),
+          props: true,
+        },
+      ],
+    },
+    ...
+  ],
+});
+
+router.beforeEach(function (to, from, next) {
+  if(to.meta.needsAuth){
+    console.log('need auth');
+  }
+  next();
+});
+```
+
+### organize files
+
+可以将 main 中的 route 部分全部取出，然后再导入 main 中，做到更好的文件整理
+原 main.js
+
+```js
+import { createApp } from 'vue';
+import { createRouter, createWebHistory } from 'vue-router';
+import App from './App.vue';
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', redirect: '/teams' },
+    {
+      name: 'teams',
+      path: '/teams',
+      meta: { needsAuth: true },
+      components: {
+        default: () => import('./pages/TeamsList.vue'),
+        footer: () => import('./components/teams/TeamFooter.vue'),
+      },
+      children: [
+        {
+          name: 'team-members',
+          path: ':teamId',
+          component: () => import('./components/teams/TeamMembers.vue'),
+          props: true,
+        },
+      ],
+    },
+    {
+      path: '/users',
+      component: () => import('./pages/UsersList.vue'),
+    },
+    { path: '/:notFound(.*)', redirect: '/teams' },
+  ],
+  scrollBehavior(_, _2, savedPosition) {
+    if (savedPosition) {
+      return savedPosition;
+    }
+    return { left: 0, top: 0 };
+  },
+});
+
+router.beforeEach(function (to, from, next) {
+  if (to.meta.needsAuth) {
+    console.log('need auth');
+  }
+  next();
+});
+
+const app = createApp(App);
+
+app.use(router);
+
+app.mount('#app');
+```
+
+新 main.js
+
+```js
+import { createApp } from 'vue';
+import App from './App.vue';
+import router from './router.js';
+
+const app = createApp(App);
+
+app.use(router);
+
+app.mount('#app');
+```
+
+router.js
+
+```js
+import { createRouter, createWebHistory } from 'vue-router';
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', redirect: '/teams' },
+    {
+      name: 'teams',
+      path: '/teams',
+      meta: { needsAuth: true },
+      components: {
+        default: () => import('./pages/TeamsList.vue'),
+        footer: () => import('./components/teams/TeamFooter.vue'),
+      },
+      children: [
+        {
+          name: 'team-members',
+          path: ':teamId',
+          component: () => import('./components/teams/TeamMembers.vue'),
+          props: true,
+        },
+      ],
+    },
+    {
+      path: '/users',
+      component: () => import('./pages/UsersList.vue'),
+    },
+    { path: '/:notFound(.*)', redirect: '/teams' },
+  ],
+  scrollBehavior(_, _2, savedPosition) {
+    if (savedPosition) {
+      return savedPosition;
+    }
+    return { left: 0, top: 0 };
+  },
+});
+
+router.beforeEach(function (to, from, next) {
+  if (to.meta.needsAuth) {
+    console.log('need auth');
+  }
+  next();
+});
+
+export default router;
 ```
 
 ## Section 15: Vuex
