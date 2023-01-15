@@ -604,3 +604,705 @@ const resolvers = {
 ```js
 users.find((user) => user.id === parent.author);
 ```
+
+## Section 3: GraphQL Basics: Mutations
+
+### Create Mutation
+
+首先，在 Schema 中定义 mutation，并决定所需要的参数和返回类型
+
+```js
+  type Mutation {
+    createUser(name: String!, email: String!, age: Int):User!
+  }
+```
+
+然后，在 Resolver 中添加对应的函数
+
+```js
+  Mutation: {
+    createUser(parent, args, ctx, info) {
+      const emailTaken = users.some((user) => user.email === args.email);
+      if (emailTaken) {
+        throw new Error('Email taken');
+      }
+      const user = {
+        id: uuidv4(),
+        name: args.name,
+        email: args.email,
+        age: args.age,
+      };
+
+      users.push(user);
+
+      return user;
+    },
+  },
+```
+
+最后，在 client 调用 mutation
+
+```
+mutation{
+  createUser(
+    name:"Jack",
+    email:"jack@ma2.com",
+    age:50){
+    id
+    name
+    email
+    age
+    posts{
+      id
+      title
+    }
+  }
+}
+```
+
+#### uuid
+
+npm i uuid@3.3.2
+
+#### 复习 some
+
+array 中有对象满足 callback 条件时候，返回为 true；没有满足 callback 条件的，返回为 false
+
+```js
+const emailTaken = users.some((user) => user.email === args.email);
+```
+
+#### babel-plugin-transform-object-rest-spread
+
+npm i babel-plugin-transform-object-rest-spread
+
+#### input type
+
+在 schema 中，我们还可以定义 input，来取代 mutation 中的 argument list；注意，argument 只能由 input 类型取代，input 类型定义中，必须全部是 scalar type； 同时对应的 resolver args 也必须加 data
+
+原本
+
+```js
+  type Mutation {
+    createUser(name: String!, email: String!, age: Int):User!
+    createPost(title: String!, body: String!, published:Boolean!, author: ID!):Post!
+    createComment(text: String!, author: ID!, post: ID!): Comment!
+  }
+```
+
+加入 input 后
+
+```js
+  type Mutation {
+    createUser(data: CreateUserInput):User!
+    createPost(title: String!, body: String!, published:Boolean!, author: ID!):Post!
+    createComment(text: String!, author: ID!, post: ID!): Comment!
+  }
+
+  input CreateUserInput {
+    name: String!
+    email:String!
+    age: Int
+  }
+```
+
+```js
+createUser(parent, args, ctx, info) {
+      const emailTaken = users.some((user) => user.email === args.data.email);
+      if (emailTaken) {
+        throw new Error('Email taken');
+      }
+      const user = {
+        id: uuidv4(),
+        ...args.data,
+      };
+
+      users.push(user);
+
+      return user;
+    },
+```
+
+client 的 query 也需要更新
+
+```
+mutation{
+  createUser(
+    data:{
+      name:"Jack",
+    	email:"jack@ma2.com",
+    	age:50
+    	}
+    ){
+    id
+    name
+    email
+    age
+    posts{
+      id
+      title
+    }
+  }
+}
+
+```
+
+### Delete mutation
+
+首先，定义该 mutation
+
+```js
+  type Mutation {
+    createUser(data: CreateUserInput!):User!
+    deleteUser(id: ID!):User!
+  }
+```
+
+然后，添加对应的 resolver
+
+```js
+    deleteUser(parent, args, ctx, info) {
+      const userIndex = users.findIndex((user) => user.id === args.id);
+      if (userIndex === -1) {
+        throw new Error('User does not exist');
+      }
+
+      const deletedUsers = users.splice(userIndex, 1);
+
+      posts = posts.filter((post) => {
+        const match = post.author === args.id;
+        if (match) {
+          comments = comments.filter((comment) => comment.post !== post.id);
+        }
+        return !match;
+      });
+      comments = comments.filter((comment) => comment.author !== args.id);
+
+      return deletedUsers[0];
+    },
+```
+
+最后，通过 client 来验证数据
+
+```
+mutation{
+  deleteUser(id:"64x12001"){
+    id
+    name
+  }
+}
+```
+
+##### 复习 findIndex
+
+跟 find 类似，只不过当不存在满足条件的对象时，该函数的返回值为-1，如果找到满足条件的对象，则返回值为该对象的 index
+
+```js
+const commentIndex = db.comments.findIndex((comment) => comment.id === args.id);
+if (commentIndex === -1) {
+  throw new Error('Comment does not exist');
+}
+```
+
+#### 复习 splice
+
+对指定数组进行删除操作，splice 传入的两个参数，第一个是开始 remove 的 element index，第二个是想要 remove 的 element 数量, 该函数返回的是被删除的元素集合
+
+```js
+const deletedUsers = users.splice(userIndex, 1);
+```
+
+### Better project structure
+
+1. 建立 schema.graphql 来存放 type definition
+2. 修改 graphQLServer 里的 typeDefs
+
+```js
+const server = new GraphQLServer({
+  typeDefs: './src/schema.graphql',
+  resolvers,
+});
+```
+
+更新 nodemon script
+
+```
+"start": "nodemon src/index.js --ext js,graphql --exec babel-node ",
+```
+
+3. 将数据 迁移到 db.js
+
+```js
+// Demo users
+const users = [
+  {
+    id: '64x12001',
+    name: 'Tom',
+    email: 'Tom@demo.com',
+    age: 22,
+  },
+  {
+    id: '64x12002',
+    name: 'Rom',
+    email: 'Rom@demo.com',
+    age: 38,
+  },
+  {
+    id: '64x12003',
+    name: 'Mike',
+    email: 'Mike@demo.com',
+    age: 12,
+  },
+];
+
+// Demo posts
+const posts = [
+  {
+    id: '64x12edd',
+    title: 'Tom is here',
+    body: 'I just found Tom',
+    published: true,
+    author: '64x12001',
+  },
+  {
+    id: '64x12ede',
+    title: 'Rom is dancing',
+    body: 'I just saw Rom dancing',
+    published: true,
+    author: '64x12001',
+  },
+  {
+    id: '64x12edf',
+    title: 'Mike go home',
+    body: 'Where is Mike',
+    published: true,
+    author: '64x12003',
+  },
+];
+
+// Demo comments
+const comments = [
+  {
+    id: '64x12f01',
+    text: 'I dont know Tom',
+    author: '64x12002',
+    post: '64x12edd',
+  },
+  {
+    id: '64x12f02',
+    text: 'I dont know Rom',
+    author: '64x12001',
+    post: '64x12ede',
+  },
+  {
+    id: '64x12f03',
+    text: 'I dont know Mike',
+    author: '64x12001',
+    post: '64x12edf',
+  },
+  {
+    id: '64x12f04',
+    text: 'I saw him too!',
+    author: '64x12003',
+    post: '64x12ede',
+  },
+];
+
+const db = {
+  users,
+  posts,
+  comments,
+};
+
+export { db as default };
+```
+
+4. 将 db 加入 context，然后可以在所有的 resolver 中通过 context 进行调用
+
+```js
+const server = new GraphQLServer({
+  typeDefs: './src/schema.graphql',
+  resolvers,
+  context: {
+    db,
+  },
+});
+```
+
+```js
+const resolvers = {
+  Query: {
+    users(parent, args, { db }, info) {
+      if (!args.query) return db.users;
+      return db.users.filter((user) =>
+        user.name.toLowerCase().includes(args.query.toLowerCase())
+      );
+    },
+  },
+};
+```
+
+5. 建立 resolver 文件夹，并建立 Query.js, Mutation.js, User.js, Post.js, Comment.js,
+6. 分别把 index 中对应的 resolver 部分导入到对应的 resolver 文件中
+
+```js
+//Query.js
+const Query = {
+  users(parent, args, { db }, info) {
+    if (!args.query) return db.users;
+    return db.users.filter((user) =>
+      user.name.toLowerCase().includes(args.query.toLowerCase())
+    );
+  },
+  posts(parent, args, { db }, info) {
+    if (!args.query) return db.posts;
+    return db.posts.filter(
+      (post) =>
+        post.body.toLowerCase().includes(args.query.toLowerCase()) ||
+        post.title.toLowerCase().includes(args.query.toLowerCase())
+    );
+  },
+  comments(parent, args, { db }, info) {
+    return db.comments;
+  },
+};
+
+export { Query as default };
+```
+
+7. 在 index 中 import resolver 文件，并且导入 resolver
+
+```js
+//index.js
+import { GraphQLServer } from 'graphql-yoga';
+import db from './db';
+import Query from './resolvers/Query';
+import Mutation from './resolvers/Mutation';
+import User from './resolvers/User';
+import Post from './resolvers/Post';
+import Comment from './resolvers/Comment';
+
+const server = new GraphQLServer({
+  typeDefs: './src/schema.graphql',
+  resolvers: {
+    Query,
+    Mutation,
+    User,
+    Post,
+    Comment,
+  },
+  context: {
+    db,
+  },
+});
+```
+
+### Update mutation
+
+首先，在 schema 中定义 mutation，和 input
+
+```js
+type Mutation {
+  createUser(data: CreateUserInput!): User!
+  deleteUser(id: ID!): User!
+  updateUser(id: ID!, data:UpdateUserInput!):User!
+}
+
+input UpdateUserInput {
+  name: String
+  email: String
+  age: Int
+}
+```
+
+完成对应的 resolver
+
+```js
+updateUser(parent, args, { db }, info) {
+    const user = db.users.find((user) => user.id === args.id);
+    if (!user) {
+      throw new Error('User does not exist');
+    }
+    if (typeof args.data.email === 'string') {
+      const emailTaken = db.users.some(
+        (user) => user.email === args.data.email
+      );
+      if (emailTaken) {
+        throw new Error('Email taken');
+      }
+      user.email = args.data.email;
+    }
+    if (typeof args.data.name === 'string') user.name = args.data.name;
+    if (typeof args.data.age !== 'undefined') user.age = args.data.age;
+
+    return user;
+  },
+```
+
+最后，使用 client 进行测试
+
+```
+mutation{
+  updateUser(id:"64x12001",data:{
+    name:"Jason"
+  }){
+    id
+    name
+    email
+    age
+  }
+}
+```
+
+## Section 4: GraphQL Basics: Subscriptions
+
+subscription 可以令 client 的 ui 跟实际的数据保持同步
+首先，添加 subscription 的定义
+
+```js
+type Subscription {
+  count: Int!
+  comment(postId: ID!): Comment!
+}
+```
+
+然后，添加对应的 resolver, 创建 Subscription.js,
+resolver 中添加的不是函数，而是一个对象，对象中包含了 subscribe 方法，即每次 subscribe 时会执行的方法；subscribe 返回的是 pubsub 的 asyncIterator，其中 asyncIterator 只有一个参数，这个参数叫做 channel name
+pubsub 还有 publish 的方法，其中两个参数，第一个为 channel name，第二个为一个 object，里面包含了我们想要 publish 的数据，publish 的方法也可以在其它的 mutation method 中出现
+
+```js
+const Subscription = {
+  count: {
+    subscribe(parent, args, { pubsub }, info) {
+      let count = 0;
+
+      setInterval(() => {
+        count++;
+        pubsub.publish('count', {
+          count,
+        });
+      }, 1000);
+
+      return pubsub.asyncIterator('count');
+    },
+  },
+  comment: {
+    subscribe(parent, { postId }, { db, pubsub }, info) {
+      const post = db.posts.find(
+        (post) => post.id === postId && post.published
+      );
+      if (!post) throw new Error('Post does not exist');
+
+      return pubsub.asyncIterator(`comment in post ${postId}`);
+    },
+  },
+};
+
+export { Subscription as default };
+```
+
+```js
+//Mutation.js
+ createComment(parent, args, { db, pubsub }, info) {
+    const userExists = db.users.some((user) => user.id === args.data.author);
+    const postExists = db.posts.some(
+      (post) => post.id === args.data.post && post.published
+    );
+    if (!userExists || !postExists) {
+      throw new Error('User or post does not exist');
+    }
+    const comment = {
+      id: uuidv4(),
+      ...args.data,
+    };
+
+    db.comments.push(comment);
+    pubsub.publish(`comment in post ${args.data.post}`, {
+      comment,
+    });
+    return comment;
+  },
+```
+
+接着，更新 index.js，导入 resolver，已经引入 pubsub，并将 pubsub 添加到 context 中
+
+```js
+import { GraphQLServer, PubSub } from 'graphql-yoga';
+
+const pubsub = new PubSub();
+
+const server = new GraphQLServer({
+  typeDefs: './src/schema.graphql',
+  resolvers: {
+    Query,
+    Mutation,
+    Subscription,
+    User,
+    Post,
+    Comment,
+  },
+  context: {
+    db,
+    pubsub,
+  },
+});
+```
+
+最后，在 client 上进行测试
+
+```
+subscription {
+  comment(postId:"64x12ede"){
+    id
+    text
+    author{
+      name
+    }
+  }
+}
+```
+
+### Expanding mutation subscription
+
+首先，因为我们要清楚的让 client 知道，返回的数据是 create/update/delete 对应产生的，因此需要增加新的 type
+
+```
+type Subscription {
+  count: Int!
+  comment(postId: ID!): Comment!
+  post: PostSubscriptionPayload!
+}
+
+type PostSubscriptionPayload {
+  mutation: String!
+  data: Post!
+}
+```
+
+然后，在对应的 mutation resolver 中添加 publish
+
+```js
+//Mutation.js
+createPost(parent, args, { db, pubsub }, info) {
+    const userExists = db.users.some((user) => user.id === args.data.author);
+    if (!userExists) {
+      throw new Error('User does not exist');
+    }
+    const post = {
+      id: uuidv4(),
+      ...args.data,
+    };
+
+    db.posts.push(post);
+    if (args.data.published) {
+      pubsub.publish('post', {
+        post: {
+          mutation: 'CREATED',
+          data: post,
+        },
+      });
+    }
+    return post;
+  },
+  updatePost(parent, args, { db, pubsub }, info) {
+    const { id, data } = args;
+    const post = db.posts.find((post) => post.id === id);
+    const originalPost = { ...post };
+    if (!post) throw new Error('Post does not exist');
+    if (typeof data.title === 'string') post.title = data.title;
+    if (typeof data.body === 'string') post.body = data.body;
+    if (typeof data.published === 'boolean') {
+      post.published = data.published;
+      if (originalPost.published && !post.published) {
+        //delete
+        pubsub.publish('post', {
+          post: {
+            mutation: 'DELETED',
+            data: originalPost,
+          },
+        });
+      } else if (!originalPost.published && post.published) {
+        //create
+        pubsub.publish('post', {
+          post: {
+            mutation: 'CREATED',
+            data: post,
+          },
+        });
+      }
+    } else if (post.published) {
+      //updated
+      pubsub.publish('post', {
+        post: {
+          mutation: 'UPDATED',
+          data: post,
+        },
+      });
+    }
+    return post;
+  },
+  deletePost(parent, args, { db, pubsub }, info) {
+    const postIndex = db.posts.findIndex((post) => post.id === args.id);
+    if (postIndex === -1) {
+      throw new Error('Post does not exist');
+    }
+    const [post] = db.posts.splice(postIndex, 1);
+    db.comments = db.comments.filter((comment) => comment.post !== args.id);
+    if (post.published) {
+      pubsub.publish('post', {
+        post: {
+          mutation: 'DELETED',
+          data: post,
+        },
+      });
+    }
+    return post;
+  },
+
+```
+
+#### 复习 []
+
+类似于解构，我们可以直接将 array 中的数据取出，然后对他进行命名，比如 const [a,b,c,d] = [1,2,3,4], 则 a=1, b=2, c=3, d=4
+
+```js
+const [post] = db.posts.splice(postIndex, 1);
+```
+
+#### 浅拷贝
+
+```js
+const originalPost = { ...post };
+```
+
+### Enums
+
+1. 可以定义一堆常量
+   - UserRole: standard, editor, admin
+
+```
+enum UserRole {
+  STANDARD
+  EDITOR
+  ADMIN
+}
+enum MutationType {
+  CREATED
+  UPDATED
+  DELETED
+}
+```
+
+2. 同样可以在 schema 中，作为返回类型使用
+
+```
+type User {
+  role: UserRole!
+}
+type PostSubscriptionPayload {
+  mutation: MutationType!
+  data: Post!
+}
+```
+
+3. 对应的 field value 一定是 enums 中的其中一个常量
